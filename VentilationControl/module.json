@@ -1,0 +1,12 @@
+{
+	"id": "{B5B6C453-45CB-660B-5F1F-A9E58277D649}",
+	"name": "VentilationControl",
+	"type": 3,
+	"vendor": "",
+	"aliases": [],
+	"parentRequirements": [],
+	"childRequirements": [],
+	"implemented": [],
+	"prefix": "VentilationControl",
+	"url": "https://github.com/demel42/VentilationControl/blob/master/README.md"
+}

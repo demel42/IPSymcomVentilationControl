@@ -5,10 +5,10 @@ declare(strict_types=1);
 require_once __DIR__ . '/../libs/common.php';
 require_once __DIR__ . '/../libs/local.php';
 
-class ModuleTemplateDevice extends IPSModule
+class VentilationControl extends IPSModule
 {
-    use ModuleTemplate\StubsCommonLib;
-    use ModuleTemplateLocalLib;
+    use VentilationControl\StubsCommonLib;
+    use VentilationControlLocalLib;
 
     private $ModuleDir;
 
@@ -25,14 +25,9 @@ class ModuleTemplateDevice extends IPSModule
 
         $this->RegisterPropertyBoolean('module_disable', false);
 
-        $this->RegisterPropertyInteger('update_interval', 60);
-
         $this->RegisterAttributeString('UpdateInfo', '');
-        $this->RegisterAttributeString('external_update_interval', '');
 
         $this->InstallVarProfiles(false);
-
-        $this->RegisterTimer('UpdateStatus', 0, 'IPS_RequestAction(' . $this->InstanceID . ', "UpdateStatus", "");');
 
         $this->RegisterMessage(0, IPS_KERNELMESSAGE);
     }
@@ -42,7 +37,6 @@ class ModuleTemplateDevice extends IPSModule
         parent::MessageSink($timestamp, $senderID, $message, $data);
 
         if ($message == IPS_KERNELMESSAGE && $data[0] == KR_READY) {
-            $this->OverwriteUpdateInterval();
         }
     }
 
@@ -79,19 +73,16 @@ class ModuleTemplateDevice extends IPSModule
         $this->MaintainReferences();
 
         if ($this->CheckPrerequisites() != false) {
-            $this->MaintainTimer('UpdateStatus', 0);
             $this->MaintainStatus(self::$IS_INVALIDPREREQUISITES);
             return;
         }
 
         if ($this->CheckUpdate() != false) {
-            $this->MaintainTimer('UpdateStatus', 0);
             $this->MaintainStatus(self::$IS_UPDATEUNCOMPLETED);
             return;
         }
 
         if ($this->CheckConfiguration() != false) {
-            $this->MaintainTimer('UpdateStatus', 0);
             $this->MaintainStatus(self::$IS_INVALIDCONFIG);
             return;
         }
@@ -100,7 +91,6 @@ class ModuleTemplateDevice extends IPSModule
 
         $module_disable = $this->ReadPropertyBoolean('module_disable');
         if ($module_disable) {
-            $this->MaintainTimer('UpdateStatus', 0);
             $this->MaintainStatus(IS_INACTIVE);
             return;
         }
@@ -108,13 +98,12 @@ class ModuleTemplateDevice extends IPSModule
         $this->MaintainStatus(IS_ACTIVE);
 
         if (IPS_GetKernelRunlevel() == KR_READY) {
-            $this->OverwriteUpdateInterval();
         }
     }
 
     private function GetFormElements()
     {
-        $formElements = $this->GetCommonFormElements('ModulTemplate Device');
+        $formElements = $this->GetCommonFormElements('Ventilation control');
 
         if ($this->GetStatus() == self::$IS_UPDATEUNCOMPLETED) {
             return $formElements;
@@ -124,14 +113,6 @@ class ModuleTemplateDevice extends IPSModule
             'type'    => 'CheckBox',
             'name'    => 'module_disable',
             'caption' => 'Disable instance'
-        ];
-
-        $formElements[] = [
-            'type'    => 'NumberSpinner',
-            'name'    => 'update_interval',
-            'suffix'  => 'Seconds',
-            'minimum' => 0,
-            'caption' => 'Update interval',
         ];
 
         return $formElements;
@@ -149,12 +130,6 @@ class ModuleTemplateDevice extends IPSModule
 
             return $formActions;
         }
-
-        $formActions[] = [
-            'type'    => 'Button',
-            'caption' => 'Update status',
-            'onClick' => 'IPS_RequestAction($id, "UpdateStatus", "");',
-        ];
 
         $formActions[] = [
             'type'      => 'ExpansionPanel',
@@ -182,52 +157,10 @@ class ModuleTemplateDevice extends IPSModule
         return $formActions;
     }
 
-    private function SetUpdateInterval(int $sec = null)
-    {
-        if (is_null($sec)) {
-            $sec = $this->ReadAttributeString('external_update_interval');
-            if ($sec == '') {
-                $sec = $this->ReadPropertyInteger('update_interval');
-            }
-        }
-        $this->MaintainTimer('UpdateStatus', $sec * 1000);
-    }
-
-    public function OverwriteUpdateInterval(int $sec = null)
-    {
-        if (is_null($sec)) {
-            $this->WriteAttributeString('external_update_interval', '');
-        } else {
-            $this->WriteAttributeString('external_update_interval', $sec);
-        }
-        $this->SetUpdateInterval($sec);
-    }
-
-    private function UpdateStatus()
-    {
-        if ($this->CheckStatus() == self::$STATUS_INVALID) {
-            $this->SendDebug(__FUNCTION__, $this->GetStatusText() . ' => skip', 0);
-            return;
-        }
-
-        /*
-        if ($this->HasActiveParent() == false) {
-            $this->SendDebug(__FUNCTION__, 'has no active parent', 0);
-            $this->LogMessage('has no active parent instance', KL_WARNING);
-            return;
-        }
-         */
-
-        $this->SendDebug(__FUNCTION__, $this->PrintTimer('UpdateStatus'), 0);
-    }
-
     private function LocalRequestAction($ident, $value)
     {
         $r = true;
         switch ($ident) {
-            case 'UpdateStatus':
-                $this->UpdateStatus();
-                break;
             default:
                 $r = false;
                 break;
