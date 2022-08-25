@@ -2,7 +2,7 @@
 	"id": "{5D307E4A-BA97-8249-2798-31FA6110509A}",
 	"name": "VentilationControl",
 	"author": "Ch. Damsky",
-	"url": "https://github.com/demel42/ModuleTenmplate.git",
+	"url": "https://github.com/demel42/IPSymconVentilationControl.git",
 	"compatibility": {
 		"version": "6.0"
 	},
