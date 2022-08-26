@@ -24,8 +24,8 @@
 
 ### a. Installation des Moduls
 
-Im [Module Store](https://www.symcon.de/service/dokumentation/komponenten/verwaltungskonsole/module-store/) ist das Modul unter dem Suchbegriff *VentilationControl* zu finden.<br>
-Alternativ kann das Modul über [Module Control](https://www.symcon.de/service/dokumentation/modulreferenz/module-control/) unter Angabe der URL `https://github.com/demel42/VentilationControl.git` installiert werden.
+Im [Module Store](https://www.symcon.de/service/dokumentation/komponenten/verwaltungskonsole/module-store/) ist das Modul unter dem Suchbegriff *VentilationMonitoring* zu finden.<br>
+Alternativ kann das Modul über [Module Control](https://www.symcon.de/service/dokumentation/modulreferenz/module-control/) unter Angabe der URL `https://github.com/demel42/VentilationMonitoring.git` installiert werden.
 
 ### b. Einrichtung in IPS
 
@@ -35,7 +35,7 @@ alle Funktionen sind über _RequestAction_ der jew. Variablen ansteuerbar
 
 ## 5. Konfiguration
 
-### VentilationControl
+### VentilationMonitoring
 
 #### Properties
 
@@ -62,7 +62,7 @@ Es werden folgende Variablenprofile angelegt:
 ### GUIDs
 - Modul: `{5D307E4A-BA97-8249-2798-31FA6110509A}`
 - Instanzen:
-  - VentilationControl: `{B5B6C453-45CB-660B-5F1F-A9E58277D649}`
+  - VentilationMonitoring: `{B5B6C453-45CB-660B-5F1F-A9E58277D649}`
 - Nachrichten:
 
 ### Quellen

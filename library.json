@@ -1,8 +1,8 @@
 {
 	"id": "{5D307E4A-BA97-8249-2798-31FA6110509A}",
-	"name": "VentilationControl",
+	"name": "VentilationMonitoring",
 	"author": "Ch. Damsky",
-	"url": "https://github.com/demel42/IPSymconVentilationControl.git",
+	"url": "https://github.com/demel42/IPSymconVentilationMonitoring.git",
 	"compatibility": {
 		"version": "6.0"
 	},

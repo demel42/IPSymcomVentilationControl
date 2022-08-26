@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-trait VentilationControlLocalLib
+trait VentilationMonitoringLocalLib
 {
     private function GetFormStatus()
     {

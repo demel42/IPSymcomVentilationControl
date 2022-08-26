@@ -1,0 +1,32 @@
+{
+	"translations": {
+		"de": {
+			"Ventilation monitoring": "Lüftungs-Überwachung",
+
+			"__properties__": "",
+			"Disable instance": "Instanz deaktivieren",
+
+			"Condition for open window detection": "Bedingung für die Erkennung eines offenen Fensters",
+			"Outside temperature": "Aussentemperatur",
+			"Initial delay": "Start-Verzögerung",
+
+			"Time unit": "Zeiteinheit",
+			"Fix value": "fester Wert",
+			"or": "oder",
+			"Variable": "Variable",
+
+			"__options__": "Timeunit",
+			"Seconds": "Sekunden",
+			"Minutes": "Minuten",
+			"Hours": "Stunden",
+			"Days": "Tage",
+
+			"__variables__": "",
+			"Start of event": "Auslöse-Zeitpunkt",
+
+			"__actions__": "",
+
+			"__end__": ""
+		}
+	}
+}
