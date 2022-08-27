@@ -1,6 +1,17 @@
 {
 	"translations": {
 		"de": {
+			"__options__": "Timeunit",
+			"Seconds": "Sekunden",
+			"Minutes": "Minuten",
+			"Hours": "Stunden",
+			"Days": "Tage",
+
+			"__variableprofile__": "VentilationMonitoring.ClosureState",
+			"Close": "Geschlossen",
+			"Tilt": "Gekippt",
+			"Open": "Geöffnet",
+
 			"__end__": ""
 		}
 	}
