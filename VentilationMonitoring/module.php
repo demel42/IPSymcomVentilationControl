@@ -19,6 +19,9 @@ class VentilationMonitoring extends IPSModule
         $this->ModuleDir = __DIR__;
     }
 
+    private static $semaphoreID = __CLASS__;
+    private static $semaphoreTM = 5 * 1000;
+
     /*
         property "open_conditions", "tilt_conditions"
             -> Fenster-Zustands-Variablen und deren Stati
@@ -49,6 +52,10 @@ class VentilationMonitoring extends IPSModule
 
      */
 
+    public static $LOWERING_MODE_TEMP = 0;
+    public static $LOWERING_MODE_TRIGGER = 1;
+    public static $LOWERING_MODE_SCRIPT = 2;
+
     public function Create()
     {
         parent::Create();
@@ -64,7 +71,20 @@ class VentilationMonitoring extends IPSModule
 
         $this->RegisterPropertyInteger('outside_temp_varID', 0);
 
+        $this->RegisterPropertyInteger('lowering_mode', self::$LOWERING_MODE_TEMP);
+        $this->RegisterPropertyFloat('lowering_temp_value', 12);
+        $this->RegisterPropertyInteger('lowering_temp_varID', 0);
+        $this->RegisterPropertyInteger('lowering_trigger', 1);
+        $this->RegisterPropertyInteger('target0_varID', 0);
+        $this->RegisterPropertyInteger('target1_varID', 0);
+        $this->RegisterPropertyInteger('target2_varID', 0);
+        $this->RegisterPropertyInteger('lowering_scriptID', 0);
+
+        $this->RegisterPropertyString('durations', json_encode([]));
+
         $this->RegisterAttributeString('UpdateInfo', '');
+
+        $this->RegisterAttributeString('state', json_encode([]));
 
         $this->InstallVarProfiles(false);
 
@@ -87,63 +107,15 @@ class VentilationMonitoring extends IPSModule
         }
     }
 
-    private function CheckConditions()
-    {
-        if ($this->CheckStatus() == self::$STATUS_INVALID) {
-            $this->SendDebug(__FUNCTION__, $this->GetStatusText() . ' => skip', 0);
-            return;
-        }
-
-        $is_open = false;
-        $is_tilt = false;
-        $conditionS = '';
-
-        $open_conditions = $this->ReadPropertyString('open_conditions');
-		if (json_decode($open_conditions, true)) {
-            $is_open = IPS_IsConditionPassing($open_conditions);
-            $conditionS .= 'open-conditions ' . ($is_open ? 'passed' : 'blocked');
-        } else {
-            $conditionS .= 'no open-conditions';
-        }
-
-        $conditionS .= ', ';
-
-        $tilt_conditions = $this->ReadPropertyString('tilt_conditions');
-		if (json_decode($tilt_conditions, true)) {
-            $is_tilt = IPS_IsConditionPassing($tilt_conditions);
-            $conditionS .= 'tilt-conditions ' . ($is_tilt ? 'passed' : 'blocked');
-        } else {
-            $conditionS .= 'no tilt-conditions';
-        }
-
-        if ($is_open) {
-            $closureState = self::$CLOSURE_STATE_OPEN;
-        } elseif ($is_tilt) {
-            $closureState = self::$CLOSURE_STATE_TILT;
-        } else {
-            $closureState = self::$CLOSURE_STATE_CLOSE;
-        }
-
-        $this->SendDebug(__FUNCTION__, $conditionS . ' => state=' . $closureState, 0);
-
-        if ($closureState != $this->GetValue('ClosureState')) {
-            $this->SetValue('ClosureState', $closureState);
-            $this->SetValue('TriggerTime', $closureState == self::$CLOSURE_STATE_CLOSE ? 0 : time());
-
-			$conditionS .= ' => state=' . $this->GetValueFormatted('ClosureState');
-			$this->AddModuleActivity($conditionS);
-        }
-    }
-
     private function CheckModuleConfiguration()
     {
         $r = [];
 
         $open_conditions = $this->ReadPropertyString('open_conditions');
         $tilt_conditions = $this->ReadPropertyString('tilt_conditions');
-		if (json_decode($open_conditions, true) == false && json_decode($tilt_conditions, true) == false) {
+        if (json_decode($open_conditions, true) == false && json_decode($tilt_conditions, true) == false) {
             $r[] = $this->Translate('Minimum one condition (open/tiled) must be defined');
-		}
+        }
 
         return $r;
     }
@@ -152,7 +124,13 @@ class VentilationMonitoring extends IPSModule
     {
         parent::ApplyChanges();
 
-        $propertyNames = ['delay_varID', 'outside_temp_varID'];
+        $propertyNames = [
+            'delay_varID',
+            'outside_temp_varID',
+            'lowering_temp_varID',
+            'target0_varID', 'target1_varID', 'target2_varID',
+            'lowering_scriptID',
+        ];
         $this->MaintainReferences($propertyNames);
 
         $varIDs = [];
@@ -287,6 +265,102 @@ class VentilationMonitoring extends IPSModule
             'caption'            => 'Outside temperature'
         ];
 
+        $lowering_mode = $this->ReadPropertyInteger('lowering_mode');
+        $formElements[] = [
+            'type'     => 'ExpansionPanel',
+            'expanded' => false,
+            'items'    => [
+                [
+                    'type'     => 'Select',
+                    'name'     => 'lowering_mode',
+                    'caption'  => 'Lowering mode',
+                    'options'  => [
+                        [
+                            'caption' => $this->Translate('Set temperatur'),
+                            'value'   => self::$LOWERING_MODE_TEMP,
+                        ],
+                        [
+                            'caption' => $this->Translate('Set trigger'),
+                            'value'   => self::$LOWERING_MODE_TRIGGER,
+                        ],
+                        [
+                            'caption' => $this->Translate('Call script'),
+                            'value'   => self::$LOWERING_MODE_SCRIPT,
+                        ],
+                    ],
+                    'onChange' => 'IPS_RequestAction(' . $this->InstanceID . ', "UpdateFormField4Lowering", $lowering_mode);',
+                ],
+                [
+                    'type'    => 'RowLayout',
+                    'items'   => [
+                        [
+                            'type'    => 'NumberSpinner',
+                            'digits'  => 1,
+                            'minimum' => 0,
+                            'maximum' => 30,
+                            'name'    => 'lowering_temp_value',
+                            'caption' => 'Fix value'
+                        ],
+                        [
+                            'type'    => 'Label',
+                            'bold'    => true,
+                            'caption' => 'or'
+                        ],
+                        [
+                            'type'               => 'SelectVariable',
+                            'validVariableTypes' => [VARIABLETYPE_FLOAT],
+                            'name'               => 'lowering_temp_varID',
+                            'caption'            => 'Variable'
+                        ],
+                    ],
+                    'name'    => 'lowering_temperature',
+                    'visible' => $this->LoweringFieldsIsVisible($lowering_mode, 'lowering_temperature'),
+                    'caption' => 'Lowering temperatur'
+                ],
+                [
+                    'type'    => 'NumberSpinner',
+                    'name'    => 'lowering_trigger',
+                    'visible' => $this->LoweringFieldsIsVisible($lowering_mode, 'lowering_trigger'),
+                    'caption' => 'Trigger value'
+                ],
+                [
+                    'type'    => 'ColumnLayout',
+                    'items'   => [
+                        [
+                            'type'               => 'SelectVariable',
+                            'validVariableTypes' => [VARIABLETYPE_INTEGER, VARIABLETYPE_FLOAT],
+                            'width'              => '500px',
+                            'name'               => 'target0_varID',
+                            'caption'            => 'Target variable 1'
+                        ],
+                        [
+                            'type'               => 'SelectVariable',
+                            'validVariableTypes' => [VARIABLETYPE_INTEGER, VARIABLETYPE_FLOAT],
+                            'width'              => '500px',
+                            'name'               => 'target1_varID',
+                            'caption'            => 'Target variable 2'
+                        ],
+                        [
+                            'type'               => 'SelectVariable',
+                            'validVariableTypes' => [VARIABLETYPE_INTEGER, VARIABLETYPE_FLOAT],
+                            'name'               => 'target2_varID',
+                            'width'              => '500px',
+                            'caption'            => 'Target variable 3'
+                        ],
+                    ],
+                    'name'               => 'lowering_targets',
+                    'visible'            => $this->LoweringFieldsIsVisible($lowering_mode, 'lowering_targets'),
+                ],
+                [
+                    'type'    => 'SelectScript',
+                    'name'    => 'lowering_scriptID',
+                    'visible' => $this->LoweringFieldsIsVisible($lowering_mode, 'lowering_scriptID'),
+                    'caption' => 'Script to lower temperatur'
+                ],
+            ],
+            'caption' => 'Lower temperatur',
+        ];
+
         $formElements[] = [
             'type'     => 'ExpansionPanel',
             'expanded' => false,
@@ -341,10 +415,10 @@ class VentilationMonitoring extends IPSModule
         }
 
         $formActions[] = [
-			'type'    => 'Button',
-			'caption' => 'Check conditions',
-			'onClick' => 'IPS_RequestAction(' . $this->InstanceID . ', "CheckConditions", "");',
-		];
+            'type'    => 'Button',
+            'caption' => 'Check conditions',
+            'onClick' => 'IPS_RequestAction(' . $this->InstanceID . ', "CheckConditions", "");',
+        ];
 
         $formActions[] = [
             'type'      => 'ExpansionPanel',
@@ -368,17 +442,57 @@ class VentilationMonitoring extends IPSModule
 
         $formActions[] = $this->GetInformationFormAction();
         $formActions[] = $this->GetReferencesFormAction();
-		$formActions[] = $this->GetModuleActivityFormAction();
+        $formActions[] = $this->GetModuleActivityFormAction();
 
         return $formActions;
+    }
+
+    private function LoweringFieldsIsVisible($mode, $field)
+    {
+        switch ($mode) {
+            case self::$LOWERING_MODE_TEMP:
+                $visible_flds = [
+                    'lowering_temperature',
+                    'lowering_targets',
+                ];
+                break;
+            case self::$LOWERING_MODE_TRIGGER:
+                $visible_flds = [
+                    'lowering_trigger',
+                    'lowering_targets',
+                ];
+                break;
+            case self::$LOWERING_MODE_SCRIPT:
+                $visible_flds = [
+                    'lowering_scriptID',
+                ];
+                break;
+        }
+        return in_array($field, $visible_flds);
     }
 
     private function LocalRequestAction($ident, $value)
     {
         $r = true;
         switch ($ident) {
-			case 'CheckConditions':
+            case 'CheckConditions':
                 $this->CheckConditions();
+                break;
+            case 'CheckTimer':
+                $this->CheckTimer();
+                break;
+            case 'UpdateFormField4Lowering':
+                $this->SendDebug(__FUNCTION__, 'ident=' . $ident . ', value=' . $value, 0);
+                $fields = [
+                    'lowering_temperature',
+                    'lowering_trigger',
+                    'lowering_targets',
+                    'lowering_scriptID',
+                ];
+                foreach ($fields as $field) {
+                    $b = $this->LoweringFieldsIsVisible($value, $field);
+                    $this->UpdateFormField($field, 'visible', $b);
+                }
                 break;
             default:
                 $r = false;
@@ -412,5 +526,146 @@ class VentilationMonitoring extends IPSModule
         if ($r) {
             $this->SetValue($ident, $value);
         }
+    }
+
+    private function CheckConditions()
+    {
+        if ($this->CheckStatus() == self::$STATUS_INVALID) {
+            $this->SendDebug(__FUNCTION__, $this->GetStatusText() . ' => skip', 0);
+            return;
+        }
+
+        if (IPS_SemaphoreEnter(self::$semaphoreID, self::$semaphoreTM) == false) {
+            $this->SendDebug(__FUNCTION__, 'sempahore ' . self::$semaphoreID . ' is not accessable', 0);
+            return;
+        }
+
+        $is_open = false;
+        $is_tilt = false;
+        $conditionS = '';
+
+        $open_conditions = $this->ReadPropertyString('open_conditions');
+        if (json_decode($open_conditions, true)) {
+            $is_open = IPS_IsConditionPassing($open_conditions);
+            $conditionS .= 'open-conditions ' . ($is_open ? 'passed' : 'blocked');
+        } else {
+            $conditionS .= 'no open-conditions';
+        }
+
+        $conditionS .= ', ';
+
+        $tilt_conditions = $this->ReadPropertyString('tilt_conditions');
+        if (json_decode($tilt_conditions, true)) {
+            $is_tilt = IPS_IsConditionPassing($tilt_conditions);
+            $conditionS .= 'tilt-conditions ' . ($is_tilt ? 'passed' : 'blocked');
+        } else {
+            $conditionS .= 'no tilt-conditions';
+        }
+
+        if ($is_open) {
+            $closureState = self::$CLOSURE_STATE_OPEN;
+        } elseif ($is_tilt) {
+            $closureState = self::$CLOSURE_STATE_TILT;
+        } else {
+            $closureState = self::$CLOSURE_STATE_CLOSE;
+        }
+
+        $this->SendDebug(__FUNCTION__, $conditionS . ' => closureState=' . $closureState, 0);
+
+        $oldClosureState = $this->GetValue('ClosureState');
+        if ($closureState != $oldClosureState) {
+            $oldClosureStateS = $this->GetValueFormatted('ClosureState');
+
+            $this->SetValue('ClosureState', $closureState);
+            $this->SetValue('TriggerTime', $closureState == self::$CLOSURE_STATE_CLOSE ? 0 : time());
+
+            $closureStateS = $this->GetValueFormatted('ClosureState');
+            $conditionS .= ': closureState=' . $closureStateS . ' (old=' . $oldClosureStateS . ')';
+
+            $jstate = json_decode($this->ReadAttributeString('state'), true);
+            if ($closureState == self::$CLOSURE_STATE_CLOSE) {
+                if ($jstate != []) {
+                    $msg = $conditionS . ' => stop timer';
+                    $this->WriteAttributeString('state', json_encode([]));
+                } else {
+                    $msg = $conditionS . ' => no timer';
+                }
+                $this->MaintainTimer('LoopTimer', 0);
+            } else {
+                $duration = $this->CalcDuration();
+                if ($duration > 0) {
+                    $varID = $this->ReadPropertyInteger('delay_varID');
+                    if (IPS_VariableExists($varID)) {
+                        $tval = GetValueInteger($varID);
+                    } else {
+                        $tval = $this->ReadPropertyInteger('delay_value');
+                    }
+                    if ($tval > 0) {
+                        $unit = $this->ReadPropertyInteger('delay_timeunit');
+                        $sec = $this->CalcByTimeunit($unit, $tval);
+                        $tvS = $tval . $this->Timeunit2Suffix($unit);
+                        $msg = $conditionS . ', started with delay of ' . $tvS;
+                        $jstate['step'] = 0;
+                        $this->WriteAttributeString('state', json_encode($jstate));
+                        $this->MaintainTimer('LoopTimer', $sec * 1000);
+                    } else {
+                        $msg = $conditionS . ', started ventilation phase of ' . $duration . 's';
+                        $jstate['step'] = 1;
+                        $this->WriteAttributeString('state', json_encode($jstate));
+                        $this->MaintainTimer('LoopTimer', $duration * 1000);
+                    }
+                } else {
+                    $msg = $conditionsS . ', no duration defined';
+                    $this->WriteAttributeString('state', json_encode([]));
+                    $this->MaintainTimer('LoopTimer', 0);
+                }
+            }
+
+            $this->SendDebug(__FUNCTION__, $msg, 0);
+            $this->AddModuleActivity($msg);
+        }
+
+        IPS_SemaphoreLeave(self::$semaphoreID);
+    }
+
+    private function CheckTimer()
+    {
+        if (IPS_SemaphoreEnter(self::$semaphoreID, self::$semaphoreTM) == false) {
+            $this->SendDebug(__FUNCTION__, 'sempahore ' . self::$semaphoreID . ' is not accessable', 0);
+            return;
+        }
+
+        $msg = '';
+        $duration = $this->CalcDuration();
+        if ($duration > 0) {
+            $jstate = json_decode($this->ReadAttributeString('state'), true);
+            if (isset($jstate['step']) && $jstate['step'] == 0) {
+                $msg .= ', started ventilation phase of ' . $duration . 's';
+                $jstate['step'] = 1;
+                $this->WriteAttributeString('state', json_encode($jstate));
+                $this->MaintainTimer('LoopTimer', $duration * 1000);
+            } else {
+                $msg .= ', make notification';
+                $this->WriteAttributeString('state', json_encode([]));
+                $this->MaintainTimer('LoopTimer', 0);
+            }
+        } else {
+            $msg .= ', no duration defined';
+            $this->WriteAttributeString('state', json_encode([]));
+            $this->MaintainTimer('LoopTimer', 0);
+        }
+
+        $this->SendDebug(__FUNCTION__, $msg, 0);
+        $this->AddModuleActivity($msg);
+
+        IPS_SemaphoreLeave(self::$semaphoreID);
+    }
+
+    private function CalcDuration()
+    {
+        $duration = 15;
+
+        $this->SendDebug(__FUNCTION__, 'duration=' . $duration, 0);
+        return $duration;
     }
 }

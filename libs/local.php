@@ -73,4 +73,48 @@ trait VentilationMonitoringLocalLib
             ],
         ];
     }
+
+    private function CalcByTimeunit(int $unit, int $val)
+    {
+        switch ($unit) {
+            case self::$TIMEUNIT_SECONDS:
+                $mul = 1;
+                break;
+            case self::$TIMEUNIT_MINUTES:
+                $mul = 60;
+                break;
+            case self::$TIMEUNIT_HOURS:
+                $mul = 60 * 60;
+                break;
+            case self::$TIMEUNIT_DAYS:
+                $mul = 60 * 60 * 24;
+                break;
+            default:
+                $mul = 0;
+                break;
+        }
+        return $val * $mul;
+    }
+
+    private function Timeunit2Suffix(int $unit)
+    {
+        switch ($unit) {
+            case self::$TIMEUNIT_SECONDS:
+                $s = 's';
+                break;
+            case self::$TIMEUNIT_MINUTES:
+                $s = 'm';
+                break;
+            case self::$TIMEUNIT_HOURS:
+                $s = 'h';
+                break;
+            case self::$TIMEUNIT_DAYS:
+                $s = 'd';
+                break;
+            default:
+                $s = '';
+                break;
+        }
+        return $s;
+    }
 }

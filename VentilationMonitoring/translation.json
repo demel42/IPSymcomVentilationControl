@@ -19,6 +19,18 @@
 			"or": "oder",
 			"Variable": "Variable",
 
+			"Lower temperatur": "Temeraturabsenkung",
+			"Lowering mode": "Absenkungsmodus",
+			"Set temperatur": "Temperatur einstellen",
+			"Set trigger": "Auslöser setzen",
+			"Call script": "Skript aufrufen",
+			"Lowering temperatur": "Absenktemperatur",
+			"Trigger value": "Wert für Auslöser",
+			"Target variable 1": "Zielvariable 1",
+			"Target variable 2": "Zielvariable 2",
+			"Target variable 3": "Zielvariable 3",
+			"Script to lower temperatur": "Skript zur Temperaturabsenkung",
+
 			"__actions__": "",
 			"Check conditions": "Bedingungen prüfen",
 
