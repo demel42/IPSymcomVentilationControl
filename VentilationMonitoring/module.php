@@ -75,10 +75,8 @@ class VentilationMonitoring extends IPSModule
         $this->RegisterPropertyFloat('lowering_temp_value', 12);
         $this->RegisterPropertyInteger('lowering_temp_varID', 0);
         $this->RegisterPropertyInteger('lowering_trigger', 1);
-        $this->RegisterPropertyInteger('target0_varID', 0);
-        $this->RegisterPropertyInteger('target1_varID', 0);
-        $this->RegisterPropertyInteger('target2_varID', 0);
         $this->RegisterPropertyInteger('lowering_scriptID', 0);
+        $this->RegisterPropertyString('lowering_targets', json_encode([]));
 
         $this->RegisterPropertyString('durations', json_encode([]));
 
@@ -128,7 +126,6 @@ class VentilationMonitoring extends IPSModule
             'delay_varID',
             'outside_temp_varID',
             'lowering_temp_varID',
-            'target0_varID', 'target1_varID', 'target2_varID',
             'lowering_scriptID',
         ];
         $this->MaintainReferences($propertyNames);
@@ -183,6 +180,15 @@ class VentilationMonitoring extends IPSModule
                 $this->RegisterMessage($varID, VM_UPDATE);
             }
         }
+        $lowering_targets = json_decode($this->ReadPropertyString('lowering_targets'), true);
+        if ($lowering_targets != false) {
+            foreach ($lowering_targets as $target) {
+                $varID = $target['varID'];
+                if (IPS_VariableExists($varID)) {
+                    $this->RegisterReference($varID);
+                }
+            }
+        }
 
         if ($this->CheckPrerequisites() != false) {
             $this->MaintainStatus(self::$IS_INVALIDPREREQUISITES);
@@ -227,8 +233,8 @@ class VentilationMonitoring extends IPSModule
         }
 
         $formElements[] = [
-            'type'    => 'CheckBox',
             'name'    => 'module_disable',
+            'type'    => 'CheckBox',
             'caption' => 'Disable instance'
         ];
 
@@ -258,11 +264,11 @@ class VentilationMonitoring extends IPSModule
         ];
 
         $formElements[] = [
+            'name'               => 'outside_temp_varID',
             'type'               => 'SelectVariable',
             'validVariableTypes' => [VARIABLETYPE_FLOAT],
             'width'              => '500px',
-            'name'               => 'outside_temp_varID',
-            'caption'            => 'Outside temperature'
+            'caption'            => 'Outside temperature',
         ];
 
         $lowering_mode = $this->ReadPropertyInteger('lowering_mode');
@@ -271,9 +277,41 @@ class VentilationMonitoring extends IPSModule
             'expanded' => false,
             'items'    => [
                 [
-                    'type'     => 'Select',
+                    'type'    => 'RowLayout',
+                    'items'   => [
+                        [
+                            'name'               => 'delay_timeunit',
+                            'type'               => 'Select',
+                            'options'            => $this->GetTimeunitAsOptions(),
+                            'width'              => '100px',
+                            'caption'            => 'Time unit',
+                        ],
+                        [
+                            'name'               => 'delay_value',
+                            'type'               => 'NumberSpinner',
+                            'minimum'            => 0,
+                            'width'              => '100px',
+                            'caption'            => 'Fix value',
+                        ],
+                        [
+                            'type'               => 'Label',
+                            'bold'               => true,
+                            'width'              => '50px',
+                            'caption'            => 'or',
+                        ],
+                        [
+                            'name'               => 'delay_varID',
+                            'type'               => 'SelectVariable',
+                            'validVariableTypes' => [VARIABLETYPE_INTEGER],
+                            'caption'            => 'Variable',
+                            'width'              => '500px',
+                        ],
+                    ],
+                    'caption'  => 'Initial delay',
+                ],
+                [
                     'name'     => 'lowering_mode',
-                    'caption'  => 'Lowering mode',
+                    'type'     => 'Select',
                     'options'  => [
                         [
                             'caption' => $this->Translate('Set temperatur'),
@@ -289,113 +327,117 @@ class VentilationMonitoring extends IPSModule
                         ],
                     ],
                     'onChange' => 'IPS_RequestAction(' . $this->InstanceID . ', "UpdateFormField4Lowering", $lowering_mode);',
+                    'caption'  => 'Lowering mode',
                 ],
                 [
+                    'name'    => 'lowering_temperature',
                     'type'    => 'RowLayout',
                     'items'   => [
                         [
+                            'name'    => 'lowering_temp_value',
                             'type'    => 'NumberSpinner',
                             'digits'  => 1,
                             'minimum' => 0,
                             'maximum' => 30,
-                            'name'    => 'lowering_temp_value',
                             'caption' => 'Fix value'
                         ],
                         [
                             'type'    => 'Label',
                             'bold'    => true,
+                            'width'   => '50px',
                             'caption' => 'or'
                         ],
                         [
+                            'name'               => 'lowering_temp_varID',
                             'type'               => 'SelectVariable',
                             'validVariableTypes' => [VARIABLETYPE_FLOAT],
-                            'name'               => 'lowering_temp_varID',
-                            'caption'            => 'Variable'
+                            'caption'            => 'Variable',
                         ],
                     ],
-                    'name'    => 'lowering_temperature',
                     'visible' => $this->LoweringFieldsIsVisible($lowering_mode, 'lowering_temperature'),
-                    'caption' => 'Lowering temperatur'
+                    'caption' => 'Lowering temperatur',
                 ],
                 [
-                    'type'    => 'NumberSpinner',
                     'name'    => 'lowering_trigger',
+                    'type'    => 'NumberSpinner',
                     'visible' => $this->LoweringFieldsIsVisible($lowering_mode, 'lowering_trigger'),
-                    'caption' => 'Trigger value'
+                    'caption' => 'Trigger value',
                 ],
                 [
-                    'type'    => 'ColumnLayout',
-                    'items'   => [
+                    'name'    => 'lowering_scriptID',
+                    'type'    => 'SelectScript',
+                    'visible' => $this->LoweringFieldsIsVisible($lowering_mode, 'lowering_scriptID'),
+                    'caption' => 'Script to lower temperatur',
+                ],
+                [
+                    'name'     => 'lowering_targets',
+                    'type'     => 'List',
+                    'rowCount' => 5,
+                    'add'      => true,
+                    'delete'   => true,
+                    'columns'  => [
                         [
-                            'type'               => 'SelectVariable',
-                            'validVariableTypes' => [VARIABLETYPE_INTEGER, VARIABLETYPE_FLOAT],
-                            'width'              => '500px',
-                            'name'               => 'target0_varID',
-                            'caption'            => 'Target variable 1'
-                        ],
-                        [
-                            'type'               => 'SelectVariable',
-                            'validVariableTypes' => [VARIABLETYPE_INTEGER, VARIABLETYPE_FLOAT],
-                            'width'              => '500px',
-                            'name'               => 'target1_varID',
-                            'caption'            => 'Target variable 2'
-                        ],
-                        [
-                            'type'               => 'SelectVariable',
-                            'validVariableTypes' => [VARIABLETYPE_INTEGER, VARIABLETYPE_FLOAT],
-                            'name'               => 'target2_varID',
-                            'width'              => '500px',
-                            'caption'            => 'Target variable 3'
+                            'name'    => 'varID',
+                            'add'     => '',
+                            'edit'    => [
+                                'type'               => 'SelectVariable',
+                                'validVariableTypes' => [VARIABLETYPE_FLOAT],
+                            ],
+                            'width'   => '500px',
+                            'caption' => 'Variable',
                         ],
                     ],
-                    'name'               => 'lowering_targets',
-                    'visible'            => $this->LoweringFieldsIsVisible($lowering_mode, 'lowering_targets'),
+                    'caption'  => 'Target variables',
                 ],
                 [
-                    'type'    => 'SelectScript',
-                    'name'    => 'lowering_scriptID',
-                    'visible' => $this->LoweringFieldsIsVisible($lowering_mode, 'lowering_scriptID'),
-                    'caption' => 'Script to lower temperatur'
+                    'name'     => 'durations',
+                    'type'     => 'List',
+                    'rowCount' => 5,
+                    'add'      => true,
+                    'delete'   => true,
+                    'columns'  => [
+                        [
+                            'name'    => 'max_temp',
+                            'add'     => 20,
+                            'edit'    => [
+                                'type'    => 'NumberSpinner',
+                                'digits'  => 1,
+                                'minimum' => 0,
+                                'maximum' => 30,
+                                'suffix'  => '°C',
+                            ],
+                            'width'   => '200px',
+                            'caption' => 'Upper temperature limit',
+                        ],
+                        [
+                            'name'    => 'duration_value',
+                            'add'     => 30,
+                            'edit'    => [
+                                'type'    => 'NumberSpinner',
+                                'minimum' => 0,
+                            ],
+                            'width'   => '200px',
+                            'caption' => 'Duration',
+                        ],
+                        [
+                            'name'    => 'duration_timeunit',
+                            'add'     => self::$TIMEUNIT_MINUTES,
+                            'edit'    => [
+                                'type'    => 'Select',
+                                'options' => $this->GetTimeunitAsOptions(),
+                            ],
+                            'width'   => '200px',
+                            'caption' => 'Time unit',
+                        ],
+                    ],
+                    'sort'     => [
+                        'column'    => 'max_temp',
+                        'direction' => 'ascending'
+                    ],
+                    'caption'  => 'Duration of ventilation until messaging',
                 ],
             ],
             'caption' => 'Lower temperatur',
-        ];
-
-        $formElements[] = [
-            'type'     => 'ExpansionPanel',
-            'expanded' => false,
-            'items'    => [
-                [
-                    'type'    => 'RowLayout',
-                    'items'   => [
-                        [
-                            'type'    => 'Select',
-                            'name'    => 'delay_timeunit',
-                            'options' => $this->GetTimeunitAsOptions(),
-                            'caption' => 'Time unit',
-                        ],
-                        [
-                            'type'    => 'NumberSpinner',
-                            'minimum' => 0,
-                            'name'    => 'delay_value',
-                            'caption' => 'Fix value'
-                        ],
-                        [
-                            'type'    => 'Label',
-                            'bold'    => true,
-                            'caption' => 'or'
-                        ],
-                        [
-                            'type'               => 'SelectVariable',
-                            'validVariableTypes' => [VARIABLETYPE_INTEGER],
-                            'name'               => 'delay_varID',
-                            'caption'            => 'Variable',
-                            'width'              => '500px',
-                        ],
-                    ],
-                ],
-            ],
-            'caption'  => 'Initial delay',
         ];
 
         return $formElements;
@@ -453,13 +495,11 @@ class VentilationMonitoring extends IPSModule
             case self::$LOWERING_MODE_TEMP:
                 $visible_flds = [
                     'lowering_temperature',
-                    'lowering_targets',
                 ];
                 break;
             case self::$LOWERING_MODE_TRIGGER:
                 $visible_flds = [
                     'lowering_trigger',
-                    'lowering_targets',
                 ];
                 break;
             case self::$LOWERING_MODE_SCRIPT:
@@ -482,11 +522,9 @@ class VentilationMonitoring extends IPSModule
                 $this->CheckTimer();
                 break;
             case 'UpdateFormField4Lowering':
-                $this->SendDebug(__FUNCTION__, 'ident=' . $ident . ', value=' . $value, 0);
                 $fields = [
                     'lowering_temperature',
                     'lowering_trigger',
-                    'lowering_targets',
                     'lowering_scriptID',
                 ];
                 foreach ($fields as $field) {
@@ -525,6 +563,116 @@ class VentilationMonitoring extends IPSModule
         }
         if ($r) {
             $this->SetValue($ident, $value);
+        }
+    }
+
+    private function AdjustTemperature($lower, &$jstate)
+    {
+        $lowering_mode = $this->ReadPropertyInteger('lowering_mode');
+
+        if ($lower) {
+            $save = [];
+            $lowering_targets = json_decode($this->ReadPropertyString('lowering_targets'), true);
+            if ($lowering_targets != false) {
+                foreach ($lowering_targets as $target) {
+                    $varID = $target['varID'];
+                    if (IPS_VariableExists($varID)) {
+                        $save[$varID] = GetValue($varID);
+                    }
+                }
+                $jstate['save'] = $save;
+                switch ($lowering_mode) {
+                    case self::$LOWERING_MODE_TEMP:
+                        $varID = $this->ReadPropertyInteger('lowering_temp_varID');
+                        if (IPS_VariableExists($varID)) {
+                            $fval = GetValueFloat($varID);
+                        } else {
+                            $fval = $this->ReadPropertyFloat('lowering_temp_value');
+                        }
+                        foreach ($lowering_targets as $target) {
+                            $varID = $target['varID'];
+                            if (IPS_VariableExists($varID)) {
+                                SetValueFloat($varID, $fval);
+                            }
+                        }
+                        break;
+                    case self::$LOWERING_MODE_TRIGGER:
+                        $ival = $this->ReadPropertyInteger('lowering_trigger', 1);
+                        foreach ($lowering_targets as $target) {
+                            $varID = $target['varID'];
+                            if (IPS_VariableExists($varID)) {
+                                SetValueInteger($varID, $ival);
+                            }
+                        }
+                        break;
+                    case self::$LOWERING_MODE_SCRIPT:
+                        $lowering_scriptID = $this->ReadPropertyInteger('lowering_scriptID');
+                        if (IPS_ScriptExists($lowering_scriptID)) {
+                            $params = [
+                                'lower'      => $lower,
+                                'save'       => json_encode($jstate['save']),
+                                'instanceID' => $this->InstanceID,
+                            ];
+                            @$r = IPS_RunScriptWaitEx($lowering_scriptID, $params);
+                            $this->SendDebug(__FUNCTION__, 'IPS_RunScriptWaitEx(' . $lowering_scriptID . ', ' . print_r($params, true) . ') ' . ($r ? 'succeed' : 'failed'), 0);
+                            if ($r != false) {
+                                @$j = json_decode($r, true);
+                                if ($j != false) {
+                                    $this->SendDebug(__FUNCTION__, 'result=' . print_r($j, true), 0);
+                                    if (isset($j['save'])) {
+                                        $save = $j['save'];
+                                    }
+                                }
+                            }
+                        }
+                        break;
+                }
+            }
+            $jstate['step'] = 'lowered';
+            $this->SendDebug(__FUNCTION__, 'saved=' . print_r($save, true), 0);
+        } else {
+            $save = isset($jstate['save']) ? $jstate['save'] : [];
+            switch ($lowering_mode) {
+                case self::$LOWERING_MODE_TEMP:
+                    foreach ($save as $varID => $val) {
+                        if (IPS_VariableExists($varID)) {
+                            SetValueFloat($varID, $val);
+                        }
+                    }
+                    break;
+                case self::$LOWERING_MODE_TRIGGER:
+                    $ival = $this->ReadPropertyInteger('lowering_trigger', 1);
+                    foreach ($save as $varID => $val) {
+                        if (IPS_VariableExists($varID)) {
+                            SetValueInteger($varID, $val);
+                        }
+                    }
+                    break;
+                case self::$LOWERING_MODE_SCRIPT:
+                    $lowering_scriptID = $this->ReadPropertyInteger('lowering_scriptID');
+                    if (IPS_ScriptExists($lowering_scriptID)) {
+                        $params = [
+                            'lower'      => $lower,
+                            'save'       => json_encode($jstate['save']),
+                            'instanceID' => $this->InstanceID,
+                        ];
+                        @$r = IPS_RunScriptWaitEx($lowering_scriptID, $params);
+                        $this->SendDebug(__FUNCTION__, 'IPS_RunScriptWaitEx(' . $lowering_scriptID . ', ' . print_r($params, true) . ') ' . ($r ? 'succeed' : 'failed'), 0);
+                        if ($r != false) {
+                            @$j = json_decode($r, true);
+                            if ($j != false) {
+                                $this->SendDebug(__FUNCTION__, 'result=' . print_r($j, true), 0);
+                                if (isset($j['save'])) {
+                                    $save = $j['save'];
+                                }
+                            }
+                        }
+                    }
+                    break;
+            }
+            $this->SendDebug(__FUNCTION__, 'resumed=' . print_r($save, true), 0);
+            $jstate['save'] = [];
+            $jstate['step'] = 'inactive';
         }
     }
 
@@ -583,42 +731,45 @@ class VentilationMonitoring extends IPSModule
             $conditionS .= ': closureState=' . $closureStateS . ' (old=' . $oldClosureStateS . ')';
 
             $jstate = json_decode($this->ReadAttributeString('state'), true);
-            if ($closureState == self::$CLOSURE_STATE_CLOSE) {
-                if ($jstate != []) {
+            $this->SendDebug(__FUNCTION__, 'old state=' . print_r($jstate, true), 0);
+            if ($closureState != self::$CLOSURE_STATE_CLOSE) {
+                $varID = $this->ReadPropertyInteger('delay_varID');
+                if (IPS_VariableExists($varID)) {
+                    $tval = GetValueInteger($varID);
+                } else {
+                    $tval = $this->ReadPropertyInteger('delay_value');
+                }
+                if ($tval > 0) {
+                    $unit = $this->ReadPropertyInteger('delay_timeunit');
+                    $sec = $this->CalcByTimeunit($unit, $tval);
+                    $tvS = $tval . $this->Timeunit2Suffix($unit);
+                    $msg = $conditionS . ', started with delay of ' . $tvS;
+                    $jstate['step'] = 'delay';
+                    $this->SendDebug(__FUNCTION__, 'new state=' . print_r($jstate, true), 0);
+                    $this->WriteAttributeString('state', json_encode($jstate));
+                    $this->MaintainTimer('LoopTimer', $sec * 1000);
+                } else {
+                    $duration = $this->CalcDuration();
+                    if ($duration > 0) {
+                        $msg = $conditionS . ', started ventilation phase of ' . $duration . 's';
+                    } else {
+                        $msg .= ', started ventilation phase with no duration';
+                    }
+                    $this->AdjustTemperature(true, $jstate);
+                    $this->SendDebug(__FUNCTION__, 'new state=' . print_r($jstate, true), 0);
+                    $this->WriteAttributeString('state', json_encode($jstate));
+                    $this->MaintainTimer('LoopTimer', $duration * 1000);
+                }
+            } else {
+                if (isset($jstate['step']) == false || $jstate['step'] != 'inactive') {
                     $msg = $conditionS . ' => stop timer';
-                    $this->WriteAttributeString('state', json_encode([]));
+                    $this->AdjustTemperature(false, $jstate);
+                    $this->SendDebug(__FUNCTION__, 'new state=' . print_r($jstate, true), 0);
+                    $this->WriteAttributeString('state', json_encode($jstate));
                 } else {
                     $msg = $conditionS . ' => no timer';
                 }
                 $this->MaintainTimer('LoopTimer', 0);
-            } else {
-                $duration = $this->CalcDuration();
-                if ($duration > 0) {
-                    $varID = $this->ReadPropertyInteger('delay_varID');
-                    if (IPS_VariableExists($varID)) {
-                        $tval = GetValueInteger($varID);
-                    } else {
-                        $tval = $this->ReadPropertyInteger('delay_value');
-                    }
-                    if ($tval > 0) {
-                        $unit = $this->ReadPropertyInteger('delay_timeunit');
-                        $sec = $this->CalcByTimeunit($unit, $tval);
-                        $tvS = $tval . $this->Timeunit2Suffix($unit);
-                        $msg = $conditionS . ', started with delay of ' . $tvS;
-                        $jstate['step'] = 0;
-                        $this->WriteAttributeString('state', json_encode($jstate));
-                        $this->MaintainTimer('LoopTimer', $sec * 1000);
-                    } else {
-                        $msg = $conditionS . ', started ventilation phase of ' . $duration . 's';
-                        $jstate['step'] = 1;
-                        $this->WriteAttributeString('state', json_encode($jstate));
-                        $this->MaintainTimer('LoopTimer', $duration * 1000);
-                    }
-                } else {
-                    $msg = $conditionsS . ', no duration defined';
-                    $this->WriteAttributeString('state', json_encode([]));
-                    $this->MaintainTimer('LoopTimer', 0);
-                }
             }
 
             $this->SendDebug(__FUNCTION__, $msg, 0);
@@ -635,23 +786,42 @@ class VentilationMonitoring extends IPSModule
             return;
         }
 
-        $msg = '';
-        $duration = $this->CalcDuration();
-        if ($duration > 0) {
-            $jstate = json_decode($this->ReadAttributeString('state'), true);
-            if (isset($jstate['step']) && $jstate['step'] == 0) {
-                $msg .= ', started ventilation phase of ' . $duration . 's';
-                $jstate['step'] = 1;
+        $jstate = json_decode($this->ReadAttributeString('state'), true);
+        $this->SendDebug(__FUNCTION__, 'old state=' . print_r($jstate, true), 0);
+
+        $closureState = $this->GetValue('ClosureState');
+        $msg = 'closureState=' . $this->GetValueFormatted('ClosureState');
+        if ($closureState != self::$CLOSURE_STATE_CLOSE) {
+            if (isset($jstate['step']) == false || $jstate['step'] == 'delay') {
+                $duration = $this->CalcDuration();
+                if ($duration > 0) {
+                    $msg .= ', started ventilation phase of ' . $duration . 's';
+                } else {
+                    $msg .= ', started ventilation phase with no duration';
+                }
+                $this->AdjustTemperature(true, $jstate);
+                $this->SendDebug(__FUNCTION__, 'new state=' . print_r($jstate, true), 0);
                 $this->WriteAttributeString('state', json_encode($jstate));
                 $this->MaintainTimer('LoopTimer', $duration * 1000);
             } else {
-                $msg .= ', make notification';
-                $this->WriteAttributeString('state', json_encode([]));
-                $this->MaintainTimer('LoopTimer', 0);
+                $duration = $this->CalcDuration();
+                if ($duration > 0) {
+                    $msg .= ', make notification';
+                    $jstate['step'] = 'notified';
+                    $this->SendDebug(__FUNCTION__, 'new state=' . print_r($jstate, true), 0);
+                    $this->WriteAttributeString('state', json_encode($jstate));
+                    $this->MaintainTimer('LoopTimer', 0);
+                }
             }
         } else {
-            $msg .= ', no duration defined';
-            $this->WriteAttributeString('state', json_encode([]));
+            if (isset($jstate['step']) == false || $jstate['step'] != 'inactive') {
+                $msg .= ' => stop timer';
+                $this->AdjustTemperature(false, $jstate);
+                $this->SendDebug(__FUNCTION__, 'new state=' . print_r($jstate, true), 0);
+                $this->WriteAttributeString('state', json_encode($jstate));
+            } else {
+                $msg .= ' => clear timer';
+            }
             $this->MaintainTimer('LoopTimer', 0);
         }
 
