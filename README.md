@@ -24,14 +24,16 @@
 
 ### a. Installation des Moduls
 
-Im [Module Store](https://www.symcon.de/service/dokumentation/komponenten/verwaltungskonsole/module-store/) ist das Modul unter dem Suchbegriff *VentilationMonitoring* zu finden.<br>
-Alternativ kann das Modul über [Module Control](https://www.symcon.de/service/dokumentation/modulreferenz/module-control/) unter Angabe der URL `https://github.com/demel42/VentilationMonitoring.git` installiert werden.
+Im [Module Store](https://www.symcon.de/service/dokumentation/komponenten/verwaltungskonsole/module-store/) ist das Modul
+unter dem Suchbegriff *VentilationMonitoring* zu finden.<br>
+Alternativ kann das Modul über [Module Control](https://www.symcon.de/service/dokumentation/modulreferenz/module-control/)
+unter Angabe der URL `https://github.com/demel42/VentilationMonitoring.git` installiert werden.
 
 ### b. Einrichtung in IPS
 
 ## 4. Funktionsreferenz
 
-alle Funktionen sind über _RequestAction_ der jew. Variablen ansteuerbar
+alle Funktionen sind über _RequestAction_ der jeweiligen Variablen ansteuerbar
 
 ## 5. Konfiguration
 
@@ -48,6 +50,7 @@ alle Funktionen sind über _RequestAction_ der jew. Variablen ansteuerbar
 
 | Bezeichnung                | Beschreibung |
 | :------------------------- | :----------- |
+|                            | |
 
 ### Variablenprofile
 
@@ -76,7 +79,9 @@ Es werden folgende Variablenprofile angelegt:
    - https://smart-wohnen.org/homematic-raumklimaueberwachung-und-entfeuchtung
    - https://homematic-forum.de/forum/viewtopic.php?f=26&t=45178
    - https://homematic-forum.de/forum/viewtopic.php?f=43&t=9835
+   - https://www.wetterochs.de/wetter/feuchte.html
    - https://www.geo.fu-berlin.de/met/service/wetterdaten/luftfeuchtigkeit.html
+   - https://www.cactus2000.de/de/unit/masshum.shtml
 
 ## 7. Versions-Historie
 
