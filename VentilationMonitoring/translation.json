@@ -11,7 +11,6 @@
 
 			"Condition for open window detection": "Bedingung zur Erkennung eines offenen Fensters",
 			"Condition for tilt window detection": "Bedingung zur Erkennung eines gekippten Fensters",
-			"Outside temperature": "Aussentemperatur",
 
 			"Initial delay": "Start-Verzögerung",
 			"Time unit": "Zeiteinheit",
@@ -31,17 +30,47 @@
 			"Variable": "Variable",
 
 			"Upper temperature limit": "Temperatur Obergrenze",
-			"Duration": "Dauer",
-			"Duration of ventilation until messaging": "Dauer der Beatmung bis zur Benachrichtigung",
+			"Duration at \"open\"": "Dauer bei \"offen\"",
+			"Duration at \"tilt\"": "Dauer bei \"gekippt\"",
+			"Duration of ventilation until messaging": "Dauer der Lüftung bis zur Benachrichtigung",
+			"Script to call after the specified duration has elapsed": "Script zum Aufruf nach Ablauf der angegebenen Dauer",
+
+			"Measured values": "Messwerte",
+			"Outside temperature": "Aussentemperatur",
+			"Outside humidity": "Relative Luftfeuchtigkeit (aussen)",
+			"Indoor temperature": "Temperatur (innen)",
+			"Indoor humidity": "Relative Luftfeuchtigkeit (innen)",
+			"Air pressure": "Luftdruck",
+			"Wall temperature on the inner side": "Temperatur auf der Innenseite der Aussenwand",
+
+			"Total thermal resistance of outer wall": "Gesamtwärmeübergangswiderstand der Außenwand",
 
 			"__actions__": "",
 			"Check conditions": "Bedingungen prüfen",
+
+			"Calculate thermal resistance": "Wärmewiderstand berechnen",
+			"Outside temperature": "Außentemperatur",
+			"Indoor temperature": "Innentemperatur",
+			"Outer wall temperature on the inner side": "Außenwandtemperatur auf der Innenseite",
+			"missing outside temperature": "fehlende Außentemperatur",
+			"missing indoor temperature": "fehlende Innentemperatur",
+			"missing wall temperature": "fehlende Wandtemperatur",
+			"The total thermal resistance of the wall is": "Der Gesamtwärmeübergangswiderstand der Wand beträgt",
 
 			"__variables__": "",
 			"Closure state": "Verschluss-Zustand",
 			"Triggering time": "Auslöse-Zeitpunkt",
 
-			"__actions__": "",
+			"Outside absolute humidity": "Absolute Luftfeuchtigkeit (aussen)",
+			"Outside specific humidity": "Spezifische Luftfeuchtigkeit (aussen)",
+			"Outside dewpoint": "Taupunkt (aussen)",
+
+			"Indoor absolute humidity": "Absolute Luftfeuchtigkeit (innen)",
+			"Indoor specific humidity": "Spezifische Luftfeuchtigkeit (innen)",
+			"Indoor dewpoint": "Taupunkt (innen)",
+
+			"Reduce humidity possible": "Verringern der Luftfeuchtigkeit möglich",
+			"Risk of mold": "Risiko einer Schimmelbildung",
 
 			"__end__": ""
 		}

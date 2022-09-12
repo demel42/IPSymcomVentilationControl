@@ -22,36 +22,6 @@ class VentilationMonitoring extends IPSModule
     private static $semaphoreID = __CLASS__;
     private static $semaphoreTM = 5 * 1000;
 
-    /*
-        property "open_conditions", "tilt_conditions"
-            -> Fenster-Zustands-Variablen und deren Stati
-
-        properties "delay_*"
-            -> damit nicht bei einem kleinen Auf/Zu sofort geregelt wird.
-
-        Aktion bei "open_conditions"
-            Variable(n) für "Fenster offen" („WINDOW_STATE“ bei HmIP) setzen
-            ODER
-            Variable(n) für Solltemperatur, alte Solltemp. merken, neu setzen
-
-            reverse bei Condition = false
-
-        Meldung nachts deaktivieren
-
-        Überschreitung Lüftungszeit melden
-            Variable Aussentemperatur
-            max. Lüftungsdauer für 3 Temperatur-Stufen (hoch/Sommer, normal/Heizperiode, Winter)
-
-        Lüftungsempfehlung
-            variable Raumtemperatur, Luftfeuchte innen & aussen
-            -> abs. Feuchte berechnen
-            -> Lüften sinnvoll?
-            -> Schimmelgefahr
-
-            CO2
-
-     */
-
     public static $LOWERING_MODE_TEMP = 0;
     public static $LOWERING_MODE_TRIGGER = 1;
     public static $LOWERING_MODE_SCRIPT = 2;
@@ -69,8 +39,6 @@ class VentilationMonitoring extends IPSModule
         $this->RegisterPropertyInteger('delay_varID', 0);
         $this->RegisterPropertyInteger('delay_timeunit', self::$TIMEUNIT_SECONDS);
 
-        $this->RegisterPropertyInteger('outside_temp_varID', 0);
-
         $this->RegisterPropertyInteger('lowering_mode', self::$LOWERING_MODE_TEMP);
         $this->RegisterPropertyFloat('lowering_temp_value', 12);
         $this->RegisterPropertyInteger('lowering_temp_varID', 0);
@@ -79,6 +47,17 @@ class VentilationMonitoring extends IPSModule
         $this->RegisterPropertyString('lowering_targets', json_encode([]));
 
         $this->RegisterPropertyString('durations', json_encode([]));
+        $this->RegisterPropertyString('notice_script', '');
+
+        $this->RegisterPropertyBoolean('with_calculations', false);
+
+        $this->RegisterPropertyInteger('outside_temp_varID', 0);
+        $this->RegisterPropertyInteger('outside_hum_varID', 0);
+        $this->RegisterPropertyInteger('indoor_temp_varID', 0);
+        $this->RegisterPropertyInteger('indoor_hum_varID', 0);
+        $this->RegisterPropertyInteger('air_pressure_varID', 0);
+
+        $this->RegisterPropertyFloat('thermal_resistance', 0);
 
         $this->RegisterAttributeString('UpdateInfo', '');
 
@@ -124,11 +103,21 @@ class VentilationMonitoring extends IPSModule
 
         $propertyNames = [
             'delay_varID',
-            'outside_temp_varID',
             'lowering_temp_varID',
             'lowering_scriptID',
+            'outside_temp_varID',
+            'outside_hum_varID',
+            'indoor_temp_varID',
+            'indoor_hum_varID',
+            'air_pressure_varID',
         ];
         $this->MaintainReferences($propertyNames);
+
+        $propertyNames = ['notice_script'];
+        foreach ($propertyNames as $name) {
+            $text = $this->ReadPropertyString($name);
+            $this->MaintainReferences4Script($text);
+        }
 
         $varIDs = [];
         $open_conditions = json_decode($this->ReadPropertyString('open_conditions'), true);
@@ -167,19 +156,13 @@ class VentilationMonitoring extends IPSModule
                 }
             }
         }
+
         foreach ($varIDs as $varID) {
             if (IPS_VariableExists($varID)) {
                 $this->RegisterReference($varID);
-                $this->RegisterMessage($varID, VM_UPDATE);
             }
         }
-        $propertyNames = ['outside_temp_varID'];
-        foreach ($propertyNames as $propertyName) {
-            $varID = $this->ReadPropertyInteger($propertyName);
-            if (IPS_VariableExists($varID)) {
-                $this->RegisterMessage($varID, VM_UPDATE);
-            }
-        }
+
         $lowering_targets = json_decode($this->ReadPropertyString('lowering_targets'), true);
         if ($lowering_targets != false) {
             foreach ($lowering_targets as $target) {
@@ -189,6 +172,19 @@ class VentilationMonitoring extends IPSModule
                 }
             }
         }
+
+        $propertyNames = [
+            'outside_temp_varID',
+            'outside_hum_varID',
+            'indoor_temp_varID',
+            'indoor_hum_varID',
+            'air_pressure_varID',
+        ];
+        foreach ($propertyNames as $propertyName) {
+            $varIDs[] = $this->ReadPropertyInteger($propertyName);
+        }
+
+        $this->UnregisterMessages([VM_UPDATE]);
 
         if ($this->CheckPrerequisites() != false) {
             $this->MaintainStatus(self::$IS_INVALIDPREREQUISITES);
@@ -205,16 +201,38 @@ class VentilationMonitoring extends IPSModule
             return;
         }
 
-        $vpos = 0;
+        $vpos = 1;
 
         $this->MaintainVariable('ClosureState', $this->Translate('Closure state'), VARIABLETYPE_INTEGER, 'VentilationMonitoring.ClosureState', $vpos++, true);
 
         $this->MaintainVariable('TriggerTime', $this->Translate('Triggering time'), VARIABLETYPE_INTEGER, '~UnixTimestamp', $vpos++, true);
 
+        $with_calculations = $this->ReadPropertyBoolean('with_calculations');
+
+        $vpos = 10;
+        $this->MaintainVariable('ReduceHumidityPossible', $this->Translate('Reduce humidity possible'), VARIABLETYPE_BOOLEAN, 'VentilationMonitoring.ReduceHumidityPossible', $vpos++, true);
+        $this->MaintainVariable('RiskOfMold', $this->Translate('Risk of mold'), VARIABLETYPE_INTEGER, 'VentilationMonitoring.RiskOfMold', $vpos++, true);
+
+        $vpos = 20;
+        $with_calculations = $this->ReadPropertyBoolean('with_calculations');
+        $this->MaintainVariable('OutsideAbsoluteHumidity', $this->Translate('Outside absolute humidity'), VARIABLETYPE_FLOAT, 'VentilationMonitoring.AbsoluteHumidity', $vpos++, $with_calculations);
+        $this->MaintainVariable('OutsideSpecificHumidity', $this->Translate('Outside specific humidity'), VARIABLETYPE_FLOAT, 'VentilationMonitoring.SpecificHumidity', $vpos++, $with_calculations);
+        $this->MaintainVariable('OutsideDewpoint', $this->Translate('Outside dewpoint'), VARIABLETYPE_FLOAT, 'VentilationMonitoring.Dewpoint', $vpos++, $with_calculations);
+
+        $this->MaintainVariable('IndoorAbsoluteHumidity', $this->Translate('Indoor absolute humidity'), VARIABLETYPE_FLOAT, 'VentilationMonitoring.AbsoluteHumidity', $vpos++, $with_calculations);
+        $this->MaintainVariable('IndoorSpecificHumidity', $this->Translate('Indoor specific humidity'), VARIABLETYPE_FLOAT, 'VentilationMonitoring.SpecificHumidity', $vpos++, $with_calculations);
+        $this->MaintainVariable('IndoorDewpoint', $this->Translate('Indoor dewpoint'), VARIABLETYPE_FLOAT, 'VentilationMonitoring.Dewpoint', $vpos++, $with_calculations);
+
         $module_disable = $this->ReadPropertyBoolean('module_disable');
         if ($module_disable) {
             $this->MaintainStatus(IS_INACTIVE);
             return;
+        }
+
+        foreach ($varIDs as $varID) {
+            if (IPS_VariableExists($varID)) {
+                $this->RegisterMessage($varID, VM_UPDATE);
+            }
         }
 
         $this->MaintainStatus(IS_ACTIVE);
@@ -261,14 +279,6 @@ class VentilationMonitoring extends IPSModule
                 ],
             ],
             'caption' => 'Condition for tilt window detection',
-        ];
-
-        $formElements[] = [
-            'name'               => 'outside_temp_varID',
-            'type'               => 'SelectVariable',
-            'validVariableTypes' => [VARIABLETYPE_FLOAT],
-            'width'              => '500px',
-            'caption'            => 'Outside temperature',
         ];
 
         $lowering_mode = $this->ReadPropertyInteger('lowering_mode');
@@ -372,7 +382,7 @@ class VentilationMonitoring extends IPSModule
                 [
                     'name'     => 'lowering_targets',
                     'type'     => 'List',
-                    'rowCount' => 5,
+                    'rowCount' => 3,
                     'add'      => true,
                     'delete'   => true,
                     'columns'  => [
@@ -392,13 +402,13 @@ class VentilationMonitoring extends IPSModule
                 [
                     'name'     => 'durations',
                     'type'     => 'List',
-                    'rowCount' => 5,
+                    'rowCount' => 3,
                     'add'      => true,
                     'delete'   => true,
                     'columns'  => [
                         [
                             'name'    => 'max_temp',
-                            'add'     => 20,
+                            'add'     => 18,
                             'edit'    => [
                                 'type'    => 'NumberSpinner',
                                 'digits'  => 1,
@@ -410,14 +420,24 @@ class VentilationMonitoring extends IPSModule
                             'caption' => 'Upper temperature limit',
                         ],
                         [
-                            'name'    => 'duration_value',
+                            'name'    => 'open',
                             'add'     => 30,
                             'edit'    => [
                                 'type'    => 'NumberSpinner',
                                 'minimum' => 0,
                             ],
                             'width'   => '200px',
-                            'caption' => 'Duration',
+                            'caption' => 'Duration at "open"',
+                        ],
+                        [
+                            'name'    => 'tilt',
+                            'add'     => 30,
+                            'edit'    => [
+                                'type'    => 'NumberSpinner',
+                                'minimum' => 0,
+                            ],
+                            'width'   => '200px',
+                            'caption' => 'Duration at "tilt"',
                         ],
                         [
                             'name'    => 'duration_timeunit',
@@ -436,8 +456,74 @@ class VentilationMonitoring extends IPSModule
                     ],
                     'caption'  => 'Duration of ventilation until messaging',
                 ],
+                [
+                    'name'      => 'notice_script',
+                    'type'      => 'ScriptEditor',
+                    'rowCount'  => 10,
+                    'caption'   => 'Script to call after the specified duration has elapsed',
+                ],
             ],
             'caption' => 'Lower temperatur',
+        ];
+
+        $formElements[] = [
+            'type'     => 'ExpansionPanel',
+            'expanded' => false,
+            'items'    => [
+                [
+                    'name'               => 'outside_temp_varID',
+                    'type'               => 'SelectVariable',
+                    'validVariableTypes' => [VARIABLETYPE_FLOAT],
+                    'width'              => '500px',
+                    'caption'            => 'Outside temperature',
+                ],
+                [
+                    'name'               => 'outside_hum_varID',
+                    'type'               => 'SelectVariable',
+                    'validVariableTypes' => [VARIABLETYPE_INTEGER, VARIABLETYPE_FLOAT],
+                    'width'              => '500px',
+                    'caption'            => 'Outside humidity',
+                ],
+                [
+                    'name'               => 'indoor_temp_varID',
+                    'type'               => 'SelectVariable',
+                    'validVariableTypes' => [VARIABLETYPE_FLOAT],
+                    'width'              => '500px',
+                    'caption'            => 'Indoor temperature',
+                ],
+                [
+                    'name'               => 'indoor_hum_varID',
+                    'type'               => 'SelectVariable',
+                    'validVariableTypes' => [VARIABLETYPE_INTEGER, VARIABLETYPE_FLOAT],
+                    'width'              => '500px',
+                    'caption'            => 'Indoor humidity',
+                ],
+                [
+                    'name'               => 'air_pressure_varID',
+                    'type'               => 'SelectVariable',
+                    'validVariableTypes' => [VARIABLETYPE_FLOAT],
+                    'width'              => '500px',
+                    'caption'            => 'Air pressure',
+                ],
+                [
+                    'type'    => 'Label',
+                ],
+                [
+                    'name'    => 'with_calculations',
+                    'type'    => 'CheckBox',
+                    'caption' => 'Variables for calculated values'
+                ],
+            ],
+            'caption' => 'Measured values',
+        ];
+
+        $formElements[] = [
+            'name'    => 'thermal_resistance',
+            'type'    => 'NumberSpinner',
+            'digits'  => 3,
+            'minimum' => 0,
+            'suffix'  => 'm²*K/W',
+            'caption' => 'Total thermal resistance of outer wall'
         ];
 
         return $formElements;
@@ -462,12 +548,115 @@ class VentilationMonitoring extends IPSModule
             'onClick' => 'IPS_RequestAction(' . $this->InstanceID . ', "CheckConditions", "");',
         ];
 
+        $values = $this->GetAllValues();
+        $varnames = [
+            'OutsideTemperature'      => ['Outside temperature', ' °C'],
+            'OutsideHumidity'         => ['Outside humidity', ' %'],
+            'OutsideAbsoluteHumidity' => ['Outside absolute humidity', ' g/m³'],
+            'OutsideSpecificHumidity' => ['Outside specific humidity', ' g/kg'],
+            'OutsideDewpoint'         => ['Outside dewpoint', ' °C'],
+
+            'IndoorTemperature'      => ['Indoor temperature', ' °C'],
+            'IndoorHumidity'         => ['Indoor humidity', ' %'],
+            'IndoorAbsoluteHumidity' => ['Indoor absolute humidity', ' g/m³'],
+            'IndoorSpecificHumidity' => ['Indoor specific humidity', ' g/kg'],
+            'IndoorDewpoint'         => ['Indoor temperature', ' °C'],
+
+            'WallTemperature' => ['Wall temperature on the inner side', ' °C'],
+
+            'AirPressure' => ['Air pressure', ' mbar'],
+        ];
+
+        $vars_rows = [];
+        foreach ($varnames as $varname => $opts) {
+            if (isset($values[$varname]) == false) {
+                continue;
+            }
+            $vars_rows[] = [
+                'varname'  => $this->Translate($opts[0]),
+                'varvalue' => $values[$varname] . $opts[1],
+            ];
+        }
+
+        $vars_item = [
+            'type'     => 'List',
+            'columns'  => [
+                [
+                    'name'     => 'varname',
+                    'width'    => '400px',
+                    'caption'  => 'Name',
+                ],
+                [
+                    'name'     => 'varvalue',
+                    'width'    => 'auto',
+                    'caption'  => 'Value',
+                ],
+            ],
+            'add'      => false,
+            'delete'   => false,
+            'rowCount' => count($vars_rows),
+            'values'   => $vars_rows,
+            'caption'  => 'internal informations',
+        ];
+
+        $outside_temp = 0;
+        $indoor_temp = 0;
+        $outside_temp_varID = $this->ReadPropertyInteger('outside_temp_varID');
+        if (IPS_VariableExists($outside_temp_varID)) {
+            $outside_temp = GetValueFloat($outside_temp_varID);
+        }
+        $indoor_temp_varID = $this->ReadPropertyInteger('indoor_temp_varID');
+        if (IPS_VariableExists($indoor_temp_varID)) {
+            $indoor_temp = GetValueFloat($indoor_temp_varID);
+        }
+
+        $calc_item = [
+            'type'    => 'RowLayout',
+            'items'   => [
+                [
+                    'type'    => 'NumberSpinner',
+                    'digits'  => 1,
+                    'minimum' => 0,
+                    'maximum' => 30,
+                    'value'   => $outside_temp,
+                    'suffix'  => '°C',
+                    'name'	   => 'outside_temp',
+                    'caption' => 'Outside temperature',
+                ],
+                [
+                    'type'    => 'NumberSpinner',
+                    'digits'  => 1,
+                    'minimum' => 0,
+                    'maximum' => 30,
+                    'value'   => $indoor_temp,
+                    'suffix'  => '°C',
+                    'name'	   => 'indoor_temp',
+                    'caption' => 'Indoor temperature',
+                ],
+                [
+                    'type'    => 'NumberSpinner',
+                    'digits'  => 1,
+                    'minimum' => 0,
+                    'maximum' => 30,
+                    'suffix'  => '°C',
+                    'name'	   => 'wall_temp',
+                    'caption' => 'Outer wall temperature on the inner side',
+                ],
+                [
+                    'type'    => 'Button',
+                    'caption' => 'Calculate thermal resistance',
+                    'onClick' => 'IPS_RequestAction(' . $this->InstanceID . ', "CalcThermalResistance", json_encode(["outside_temp" => $outside_temp, "indoor_temp" => $indoor_temp, "wall_temp" => $wall_temp]));',
+                ],
+            ],
+        ];
         $formActions[] = [
             'type'      => 'ExpansionPanel',
             'caption'   => 'Expert area',
             'expanded ' => false,
             'items'     => [
+                $calc_item,
                 $this->GetInstallVarProfilesFormItem(),
+                $vars_item,
             ],
         ];
 
@@ -532,6 +721,9 @@ class VentilationMonitoring extends IPSModule
                     $this->UpdateFormField($field, 'visible', $b);
                 }
                 break;
+            case 'CalcThermalResistance':
+                $this->CalcThermalResistance($value);
+                break;
             default:
                 $r = false;
                 break;
@@ -580,28 +772,29 @@ class VentilationMonitoring extends IPSModule
                         $save[$varID] = GetValue($varID);
                     }
                 }
-                $jstate['save'] = $save;
                 switch ($lowering_mode) {
                     case self::$LOWERING_MODE_TEMP:
                         $varID = $this->ReadPropertyInteger('lowering_temp_varID');
                         if (IPS_VariableExists($varID)) {
-                            $fval = GetValueFloat($varID);
+                            $val = GetValueFloat($varID);
                         } else {
-                            $fval = $this->ReadPropertyFloat('lowering_temp_value');
+                            $val = $this->ReadPropertyFloat('lowering_temp_value');
                         }
                         foreach ($lowering_targets as $target) {
                             $varID = $target['varID'];
                             if (IPS_VariableExists($varID)) {
-                                SetValueFloat($varID, $fval);
+                                RequestAction($varID, $val);
+                                $this->SendDebug(__FUNCTION__, 'RequestAction(' . $varID . ' ' . IPS_GetLocation($varID) . ', ' . $val . ')', 0);
                             }
                         }
                         break;
                     case self::$LOWERING_MODE_TRIGGER:
-                        $ival = $this->ReadPropertyInteger('lowering_trigger', 1);
+                        $val = $this->ReadPropertyInteger('lowering_trigger');
                         foreach ($lowering_targets as $target) {
                             $varID = $target['varID'];
                             if (IPS_VariableExists($varID)) {
-                                SetValueInteger($varID, $ival);
+                                RequestAction($varID, $val);
+                                $this->SendDebug(__FUNCTION__, 'RequestAction(' . $varID . ' ' . IPS_GetLocation($varID) . ', ' . $val . ')', 0);
                             }
                         }
                         break;
@@ -628,6 +821,7 @@ class VentilationMonitoring extends IPSModule
                         break;
                 }
             }
+            $jstate['save'] = $save;
             $jstate['step'] = 'lowered';
             $this->SendDebug(__FUNCTION__, 'saved=' . print_r($save, true), 0);
         } else {
@@ -636,15 +830,16 @@ class VentilationMonitoring extends IPSModule
                 case self::$LOWERING_MODE_TEMP:
                     foreach ($save as $varID => $val) {
                         if (IPS_VariableExists($varID)) {
-                            SetValueFloat($varID, $val);
+                            RequestAction($varID, $val);
+                            $this->SendDebug(__FUNCTION__, 'RequestAction(' . $varID . ' ' . IPS_GetLocation($varID) . ', ' . $val . ')', 0);
                         }
                     }
                     break;
                 case self::$LOWERING_MODE_TRIGGER:
-                    $ival = $this->ReadPropertyInteger('lowering_trigger', 1);
                     foreach ($save as $varID => $val) {
                         if (IPS_VariableExists($varID)) {
-                            SetValueInteger($varID, $val);
+                            RequestAction($varID, $val);
+                            $this->SendDebug(__FUNCTION__, 'RequestAction(' . $varID . ' ' . IPS_GetLocation($varID) . ', ' . $val . ')', 0);
                         }
                     }
                     break;
@@ -753,7 +948,7 @@ class VentilationMonitoring extends IPSModule
                     if ($duration > 0) {
                         $msg = $conditionS . ', started ventilation phase of ' . $duration . 's';
                     } else {
-                        $msg .= ', started ventilation phase with no duration';
+                        $msg = $conditionS . ', started ventilation phase with no duration';
                     }
                     $this->AdjustTemperature(true, $jstate);
                     $this->SendDebug(__FUNCTION__, 'new state=' . print_r($jstate, true), 0);
@@ -777,6 +972,21 @@ class VentilationMonitoring extends IPSModule
         }
 
         IPS_SemaphoreLeave(self::$semaphoreID);
+
+        $values = $this->GetAllValues();
+        $varnames = [
+            'OutsideAbsoluteHumidity',
+            'OutsideDewpoint',
+            'OutsideSpecificHumidity',
+            'IndoorAbsoluteHumidity',
+            'IndoorSpecificHumidity',
+            'IndoorDewpoint',
+            'ReduceHumidityPossible',
+        ];
+
+        foreach ($varnames as $varname) {
+            $this->SetValue($varname, $values[$varname]);
+        }
     }
 
     private function CheckTimer()
@@ -806,8 +1016,29 @@ class VentilationMonitoring extends IPSModule
             } else {
                 $duration = $this->CalcDuration();
                 if ($duration > 0) {
-                    $msg .= ', make notification';
-                    $jstate['step'] = 'notified';
+                    $notice_script = $this->ReadPropertyString('notice_script');
+                    if ($notice_script != false) {
+                        $msg .= ', make notification';
+                        $params = [
+                            'instanceID' => $this->InstanceID,
+                        ];
+                        $lowering_targets = json_decode($this->ReadPropertyString('lowering_targets'), true);
+                        if ($lowering_targets != false) {
+                            $targets = [];
+                            foreach ($lowering_targets as $target) {
+                                $varID = $target['varID'];
+                                if (IPS_VariableExists($varID)) {
+                                    $targets[] = $varID;
+                                }
+                            }
+                            $params['targets'] = implode(',', $targets);
+                        }
+                        @$r = IPS_RunScriptTextWaitEx($script, $params);
+                        $this->SendDebug(__FUNCTION__, 'script("...", ' . print_r($params, true) . ' => ' . $r, 0);
+                        if ($r != false) {
+                            $jstate['step'] = 'notified';
+                        }
+                    }
                     $this->SendDebug(__FUNCTION__, 'new state=' . print_r($jstate, true), 0);
                     $this->WriteAttributeString('state', json_encode($jstate));
                     $this->MaintainTimer('LoopTimer', 0);
@@ -831,11 +1062,350 @@ class VentilationMonitoring extends IPSModule
         IPS_SemaphoreLeave(self::$semaphoreID);
     }
 
+    private function CalcThermalResistance($params)
+    {
+        $this->SendDebug(__FUNCTION__, 'params=' . print_r($params, true), 0);
+        $jparams = json_decode($params, true);
+
+        if (isset($jparams['outside_temp']) == false) {
+            $msg = $this->Translate('missing outside temperature');
+            $this->PopupMessage($msg);
+            return;
+        }
+        $outside_temp = (float) $jparams['outside_temp'];
+
+        if (isset($jparams['indoor_temp']) == false) {
+            $msg = $this->Translate('missing indoor temperature');
+            $this->PopupMessage($msg);
+            return;
+        }
+        $indoor_temp = (float) $jparams['indoor_temp'];
+
+        if (isset($jparams['wall_temp']) == false) {
+            $msg = $this->Translate('missing wall temperature');
+            $this->PopupMessage($msg);
+            return;
+        }
+        $wall_temp = (float) $jparams['wall_temp'];
+
+        @$Rges = 0.13 * (($outside_temp - $indoor_temp) / ($wall_temp - $indoor_temp));
+        if (is_float($Rges) == false || is_infinite($Rges) || is_nan($Rges)) {
+            $msg = $this->Translate('The value is not calculable');
+            $this->PopupMessage($msg);
+            return;
+        }
+
+        $Rges = round($Rges * 1000) / 1000;
+
+        // "The total thermal resistance of the outer wall is": "Der Gesamtwärmewiderstand der Aussenwand beträgt",
+        $msg = $this->Translate('The total thermal resistance of the wall is') . ' ' . $Rges . ' m²*K/W';
+        $this->PopupMessage($msg);
+    }
+
+    private function cmp_durations($a, $b)
+    {
+        return ($a['max_temp'] < $b['max_temp']) ? -11 : 1;
+    }
+
     private function CalcDuration()
     {
-        $duration = 15;
+        $sec = 0;
 
-        $this->SendDebug(__FUNCTION__, 'duration=' . $duration, 0);
-        return $duration;
+        $state = $this->GetValue('ClosureState') == self::$CLOSURE_STATE_TILT ? 'tilt' : 'open';
+
+        $durations = json_decode($this->ReadPropertyString('durations'), true);
+        if ($durations != false) {
+            usort($durations, [__CLASS__, 'cmp_durations']);
+            $varID = $this->ReadPropertyInteger('outside_temp_varID');
+            if (IPS_VariableExists($varID)) {
+                $temp = GetValueFloat($varID);
+                foreach ($durations as $duration) {
+                    if ($temp < $duration['max_temp']) {
+                        $value = $duration[$state];
+                        $sec = $this->CalcByTimeunit($duration['duration_timeunit'], $value);
+                        break;
+                    }
+                }
+            } else {
+                if (count($durations) > 0) {
+                    $duration = $durations[0];
+                    $value = $duration[$state];
+                    $sec = $this->CalcByTimeunit($duration['duration_timeunit'], $value);
+                }
+            }
+        }
+
+        $this->SendDebug(__FUNCTION__, 'duration=' . $sec . 's', 0);
+        return $sec;
+    }
+
+    private function GetAllValues()
+    {
+        $values = [];
+
+        $outside_temp_varID = $this->ReadPropertyInteger('outside_temp_varID');
+        $outside_hum_varID = $this->ReadPropertyInteger('outside_hum_varID');
+        $indoor_temp_varID = $this->ReadPropertyInteger('indoor_temp_varID');
+        $indoor_hum_varID = $this->ReadPropertyInteger('indoor_hum_varID');
+        $air_pressure_varID = $this->ReadPropertyInteger('air_pressure_varID');
+        $thermal_resistance = $this->ReadPropertyFloat('thermal_resistance');
+
+        if (IPS_VariableExists($outside_temp_varID) && IPS_VariableExists($outside_hum_varID)) {
+            $outside_temp = GetValueFloat($outside_temp_varID);
+            $values['OutsideTemperature'] = $outside_temp;
+
+            $outside_hum = (float) GetValue($outside_hum_varID);
+            $values['OutsideHumidity'] = $outside_hum;
+
+            $outside_absolute_hum = $this->CalcAbsoluteHumidity($outside_temp, $outside_hum);
+            $values['OutsideAbsoluteHumidity'] = $outside_absolute_hum;
+
+            $outside_dewpoint = $this->CalcDewpoint($outside_temp, $outside_hum);
+            $values['OutsideDewpoint'] = $outside_dewpoint;
+
+            if (IPS_VariableExists($air_pressure_varID)) {
+                $air_pressure = GetValueFloat($air_pressure_varID);
+                $values['AirPressure'] = $air_pressure;
+
+                $outside_specific_hum = $this->CalcSpecificHumidity($outside_temp, $outside_hum, $air_pressure);
+                $values['OutsideSpecificHumidity'] = $outside_specific_hum;
+            }
+
+            if (IPS_VariableExists($indoor_temp_varID) && IPS_VariableExists($indoor_hum_varID)) {
+                $indoor_temp = GetValueFloat($indoor_temp_varID);
+                $values['IndoorTemperature'] = $indoor_temp;
+
+                $indoor_hum = (float) GetValue($indoor_hum_varID);
+                $values['IndoorHumidity'] = $indoor_hum;
+
+                $indoor_absolute_hum = $this->CalcAbsoluteHumidity($indoor_temp, $indoor_hum);
+                $values['IndoorAbsoluteHumidity'] = $indoor_absolute_hum;
+
+                $indoor_dewpoint = $this->CalcDewpoint($indoor_temp, $indoor_hum);
+                $values['IndoorDewpoint'] = $indoor_dewpoint;
+
+                if (IPS_VariableExists($air_pressure_varID)) {
+                    $indoor_specific_hum = $this->CalcSpecificHumidity($indoor_temp, $indoor_hum, $air_pressure);
+                    $values['IndoorSpecificHumidity'] = $indoor_specific_hum;
+                }
+
+                $reduce_possible = $outside_specific_hum <= ($indoor_specific_hum - 0.8 /* Hysterese */);
+                $values['ReduceHumidityPossible'] = $reduce_possible;
+
+                if ($thermal_resistance > 0) {
+                    $wall_temp = $indoor_temp + ((0.13 / $thermal_resistance) * ($outside_temp - $indoor_temp));
+                    $values['WallTemperature'] = $wall_temp;
+
+                    $tdif = $wall_temp - $indoor_dewpoint;
+                    if ($tdif > 2) {
+                        $mold_risk = self::$RISK_OF_MOLD_NONE;
+                    } elseif ($tdif > 1) {
+                        $mold_risk = self::$RISK_OF_MOLD_WARN;
+                    } else {
+                        $mold_risk = self::$RISK_OF_MOLD_ALARM;
+                    }
+                    $values['RiskOfMold'] = $mold_risk;
+                }
+            }
+        }
+
+        $this->SendDebug(__FUNCTION__, 'values=' . print_r($values, true), 0);
+        return $values;
+    }
+
+    // Taupunkt berechnen
+    //   Quelle: https://www.wetterochs.de/wetter/feuchte.html
+    private function CalcDewpoint(float $temp, float $humidity)
+    {
+        if ($temp > 0) {
+            $k2 = 17.62;
+            $k3 = 243.12;
+        } else {
+            $k2 = 22.46;
+            $k3 = 272.62;
+        }
+        $dewpoint = $k3 * (($k2 * $temp) / ($k3 + $temp) + log($humidity / 100));
+        $dewpoint = $dewpoint / (($k2 * $k3) / ($k3 + $temp) - log($humidity / 100));
+        $dewpoint = round($dewpoint, 0);
+        return $dewpoint;
+    }
+
+    // relative Luffeuchtigkeit in absolute Feuchte umrechnen
+    //   Quelle: https://www.wetterochs.de/wetter/feuchte.html
+    private function CalcAbsoluteHumidity(float $temp, float $humidity)
+    {
+        if ($temp >= 0) {
+            $a = 7.5;
+            $b = 237.3;
+        } else {
+            $a = 7.6;
+            $b = 240.7;
+        }
+
+        $R = 8314.3; // universelle Gaskonstante in J/(kmol*K)
+        $mw = 18.016; // Molekulargewicht des Wasserdampfes in kg/kmol
+
+        // Sättigungsdamphdruck in hPa
+        $SDD = 6.1078 * pow(10, (($a * $temp) / ($b + $temp)));
+
+        // Dampfdruck in hPa
+        $DD = $humidity / 100 * $SDD;
+
+        $v = log10($DD / 6.1078);
+
+        // Taupunkttemperatur in °C
+        $TD = $b * $v / ($a - $v);
+
+        // Temperatur in Kelvin
+        $TK = $temp + 273.15;
+
+        // absolute Feuchte in g Wasserdampf pro m³ Luft
+        $AF = pow(10, 5) * $mw / $R * $DD / $TK;
+        $AF = round($AF * 10) / 10; // auf eine NK runden
+
+        return $AF;
+    }
+
+    // relative Luffeuchtigkeit in spezifische Feuchte umrechnen
+    //   Quelle: https://www.geo.fu-berlin.de/met/service/wetterdaten/luftfeuchtigkeit.html
+    //           https://www.cactus2000.de/de/unit/masshum.shtml
+    private function CalcSpecificHumidity(float $temp, float $humidity, float $pressure)
+    {
+        if ($temp >= 0) {
+            $a = 7.5;
+            $b = 237.3;
+        } else {
+            $a = 7.6;
+            $b = 240.7;
+        }
+
+        $R = 8314.3; // universelle Gaskonstante in J/(kmol*K)
+        $mw = 18.016; // Molekulargewicht des Wasserdampfes in kg/kmol
+
+        // Sättigungsdamphdruck in hPa
+        $SDD = 6.1078 * pow(10, (($a * $temp) / ($b + $temp)));
+
+        // Dampfdruck in hPa
+        $DD = $humidity / 100 * $SDD;
+
+        // Spezifische Feuchte in g/kg feuchte Luft
+        // Gewicht des Wasserdampfes, der in 1kg feuchter Luft enthalten ist.
+        $SF = 0.622 * $DD / ($pressure - 0.378 * $DD) * 1000;
+        $SF = round($SF * 100) / 100; // auf zwei NK runden
+        return $SF;
     }
 }
+
+/*
+
+Eine einfache Möglichkeit zur Bewertung der Wahrscheinlichkeit für eine Schimmelbildung ist der direkte Vergleich von Wandtemperatur (t_w)  und Taupunkttemperatur (t_p) , z.B. nach folgender Regel…
+
+keine Schimmelgefahr, wenn t_w  mehr als 2 °C über t_p .
+Schimmelwarnung, wenn t_w  zwischen 1°C bis 2 °C über t_p .
+Schimmelalarm, wenn t_w  unter oder bis zu 1 °C über t_p .
+
+
+
+! Lokale Variablen
+    real tin = oTi.Value(); ! Temperatur in °C innen
+    integer rfin = oHi.Value(); ! relative Feuchte in % innen
+    real afin;  ! absolute feuchte in g/kg innen
+    real tau = oTa.Value(); ! Temperatur in °C außen
+    integer rfau = oHa.Value(); ! relative Feuchte in % außen
+    real afau; ! absolute feuchte in g/kg außen
+
+! Berechnung der absoluten Feuchte innen
+    if ( tin < 0.0 )
+            { tin = 0.0; }
+    if ( tin < 10.0 )
+            { afin = (3.78 + (0.29 * tin) + (0.0046 * tin * tin) + (0.00051 * tin * tin * tin)) * 0.01 * rfin; }
+        else
+            { afin = (7.62 + (0.51 * (tin-10.0)) + (0.0143 * (tin-10.0) * (tin-10.0)) + (0.00045 * (tin-10.0) * (tin-10.0) * (tin-10.0))) * 0.01 * rfin; }
+
+! Berechnung der absoluten Feuchte außen
+    if ( tau < 0.0 )
+            { tau = 0.0; }
+    if ( tau < 10.0 )
+            { afau = (3.78 + (0.29 * tau) + (0.0046 * tau * tau) + (0.00051 * tau * tau * tau)) * 0.01 * rfau; }
+        else
+            { afau = (7.62 + (0.51 * (tau-10.0)) + (0.0143 * (tau-10.0) * (tau-10.0)) + (0.00045 * (tau-10.0) * (tau-10.0) * (tau-10.0))) * 0.01 * rfau; }
+
+! Berechnung der Lüftungsempfehlung mit 0,8 g/kg Hysterese und update der SysVar
+    if ( afau <= ( afin - 0.8 ) )
+            { oLueften.State(true); }
+        else
+            { oLueften.State(false); }
+
+
+
+        https://smart-wohnen.org/homematic-raumklimaueberwachung-und-entfeuchtung/
+        Rges
+
+
+        https://www.hausmagazin.com/u-wert-berechnen-inkl-tabelle-und-rechner-so-wird-es-gemacht/
+
+        Rges = 0.13*((ta-ti)/(tw-ti))
+
+
+! Berechnung der Oberflächentemperatur der Außenwand
+real tw;      ! Oberflächentemperatur der Außenwand in °C
+real ta;      ! Außentemperatur in °C
+real ti;      ! Raumtemperatur in °C
+real Rges;    ! gesamter Wärmedurchgangswiderstand der Außenwand in m²*K/W
+
+tw = ti + ((0.13 / Rges) * (ta - ti));
+
+
+
+        property "open_conditions", "tilt_conditions"
+            -> Fenster-Zustands-Variablen und deren Stati
+
+        properties "delay_*"
+            -> damit nicht bei einem kleinen Auf/Zu sofort geregelt wird.
+
+        Aktion bei "open_conditions"
+            Variable(n) für "Fenster offen" („WINDOW_STATE“ bei HmIP) setzen
+            ODER
+            Variable(n) für Solltemperatur, alte Solltemp. merken, neu setzen
+
+            reverse bei Condition = false
+
+        Meldung nachts deaktivieren
+
+        Überschreitung Lüftungszeit melden
+            Variable Aussentemperatur
+            max. Lüftungsdauer für 3 Temperatur-Stufen (hoch/Sommer, normal/Heizperiode, Winter)
+
+        https://homematic-forum.de/forum/viewtopic.php?f=43&t=9835
+
+        Lüftungsempfehlung
+            variable Raumtemperatur, Luftfeuchte innen & aussen
+            -> abs. Feuchte berechnen
+            -> Lüften sinnvoll?
+            -> Schimmelgefahr
+
+            CO2
+
+
+! Werte einlesen
+t = dom.GetObject(raum#".Sensor").DPByHssDP("TEMPERATURE").Value();
+rf = dom.GetObject(raum#".Sensor").DPByHssDP("HUMIDITY").Value();
+
+! Berechnung Sättigungsfeuchtegehalt
+if (t < 0.0) {
+    t = 0.0;
+}
+if (t < 10.0) {
+    af = (3.78 + (0.285 * t) + (0.0052 * t * t) + (0.0005 * t * t * t));
+} else {
+    af = (7.62 + (0.524 * (t-10.0)) + (0.0131 * (t-10.0) * (t-10.0)) + (0.00048 * (t-10.0) * (t-10.0) * (t-10.0)));
+}
+! Feuchtegehalt
+af = (af * rf) / (100.0 + af * (100.0 - rf) / 622);
+
+
+
+        // Ventilation to reduce humidity reasonably possible -> Lüften zur Senkung der Luftfeuchtigkeit sinnvoll möglich
+
+ */
+

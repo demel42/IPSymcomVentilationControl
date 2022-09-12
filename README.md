@@ -53,9 +53,16 @@ alle Funktionen sind über _RequestAction_ der jew. Variablen ansteuerbar
 
 Es werden folgende Variablenprofile angelegt:
 * Boolean<br>
+  VentilationMonitoring.ReduceHumidityPossible
+
 * Integer<br>
+  VentilationMonitoring.ClosureState,
+  VentilationMonitoring.RiskOfMold
+
 * Float<br>
-* String<br>
+  VentilationMonitoring.AbsoluteHumidity,
+  VentilationMonitoring.Dewpoint,
+  VentilationMonitoring.SpecificHumidity
 
 ## 6. Anhang
 
@@ -66,8 +73,12 @@ Es werden folgende Variablenprofile angelegt:
 - Nachrichten:
 
 ### Quellen
+   - https://smart-wohnen.org/homematic-raumklimaueberwachung-und-entfeuchtung
+   - https://homematic-forum.de/forum/viewtopic.php?f=26&t=45178
+   - https://homematic-forum.de/forum/viewtopic.php?f=43&t=9835
+   - https://www.geo.fu-berlin.de/met/service/wetterdaten/luftfeuchtigkeit.html
 
 ## 7. Versions-Historie
 
-- 0.9 @ dd.mm.yyyy HH:MM (beta)
+- 0.9 @ 12.09.2022 15:25
   - Initiale Version

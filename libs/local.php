@@ -33,6 +33,10 @@ trait VentilationMonitoringLocalLib
     public static $CLOSURE_STATE_TILT = 1;
     public static $CLOSURE_STATE_OPEN = 2;
 
+    public static $RISK_OF_MOLD_NONE = 0;
+    public static $RISK_OF_MOLD_WARN = 1;
+    public static $RISK_OF_MOLD_ALARM = 2;
+
     private function InstallVarProfiles(bool $reInstall = false)
     {
         if ($reInstall) {
@@ -40,11 +44,28 @@ trait VentilationMonitoringLocalLib
         }
 
         $associations = [
+            ['Wert' => false, 'Name' => $this->Translate('No'), 'Farbe' => -1],
+            ['Wert' => true, 'Name' => $this->Translate('Yes'), 'Farbe' => -1],
+        ];
+        $this->CreateVarProfile('VentilationMonitoring.ReduceHumidityPossible', VARIABLETYPE_BOOLEAN, '', 0, 0, 0, 0, '', $associations, $reInstall);
+
+        $associations = [
             ['Wert' => self::$CLOSURE_STATE_CLOSE, 'Name' => $this->Translate('Close'), 'Farbe' => -1],
             ['Wert' => self::$CLOSURE_STATE_TILT, 'Name' => $this->Translate('Tilt'), 'Farbe' => -1],
             ['Wert' => self::$CLOSURE_STATE_OPEN, 'Name' => $this->Translate('Open'), 'Farbe' => -1],
         ];
         $this->CreateVarProfile('VentilationMonitoring.ClosureState', VARIABLETYPE_INTEGER, '', 0, 0, 0, 0, '', $associations, $reInstall);
+
+        $associations = [
+            ['Wert' => self::$RISK_OF_MOLD_NONE, 'Name' => $this->Translate('None'), 'Farbe' => -1],
+            ['Wert' => self::$RISK_OF_MOLD_WARN, 'Name' => $this->Translate('Warning'), 'Farbe' => -1],
+            ['Wert' => self::$RISK_OF_MOLD_ALARM, 'Name' => $this->Translate('Alarm'), 'Farbe' => -1],
+        ];
+        $this->CreateVarProfile('VentilationMonitoring.RiskOfMold', VARIABLETYPE_INTEGER, '', 0, 0, 0, 0, '', $associations, $reInstall);
+
+        $this->CreateVarProfile('VentilationMonitoring.AbsoluteHumidity', VARIABLETYPE_FLOAT, ' g/m³', 0, 0, 0, 0, 'Drops', [], $reInstall);
+        $this->CreateVarProfile('VentilationMonitoring.SpecificHumidity', VARIABLETYPE_FLOAT, ' g/kg', 0, 0, 0, 0, 'Drops', [], $reInstall);
+        $this->CreateVarProfile('VentilationMonitoring.Dewpoint', VARIABLETYPE_FLOAT, ' °C', 0, 30, 0, 0, 'Drops', [], $reInstall);
     }
 
     public static $TIMEUNIT_SECONDS = 0;

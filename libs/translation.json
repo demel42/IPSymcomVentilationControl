@@ -12,6 +12,15 @@
 			"Tilt": "Gekippt",
 			"Open": "Geöffnet",
 
+			"__variableprofile__": "VentilationMonitoring.RiskOfMold",
+			"None": "kein",
+			"Warning": "Warnung",
+			"Alarm": "Alarm",
+
+			"__variableprofile__": "VentilationMonitoring.ReduceHumidityPossible",
+			"No": "Nein",
+			"Yes": "Ja",
+
 			"__end__": ""
 		}
 	}
