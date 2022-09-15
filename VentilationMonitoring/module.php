@@ -47,9 +47,16 @@ class VentilationMonitoring extends IPSModule
         $this->RegisterPropertyString('lowering_targets', json_encode([]));
 
         $this->RegisterPropertyString('durations', json_encode([]));
+
         $this->RegisterPropertyString('notice_script', '');
 
+        $this->RegisterPropertyInteger('pause_value', 0);
+        $this->RegisterPropertyInteger('pause_varID', 0);
+        $this->RegisterPropertyInteger('pause_timeunit', self::$TIMEUNIT_MINUTES);
+
         $this->RegisterPropertyBoolean('with_calculations', false);
+        $this->RegisterPropertyBoolean('with_reduce_humidity', false);
+        $this->RegisterPropertyBoolean('with_risk_of_mold', false);
 
         $this->RegisterPropertyInteger('outside_temp_varID', 0);
         $this->RegisterPropertyInteger('outside_hum_varID', 0);
@@ -91,7 +98,50 @@ class VentilationMonitoring extends IPSModule
         $open_conditions = $this->ReadPropertyString('open_conditions');
         $tilt_conditions = $this->ReadPropertyString('tilt_conditions');
         if (json_decode($open_conditions, true) == false && json_decode($tilt_conditions, true) == false) {
+            $this->SendDebug(__FUNCTION__, '"open_conditions" and "tilt_conditions" must be defined', 0);
             $r[] = $this->Translate('Minimum one condition (open/tiled) must be defined');
+        }
+
+        $with_reduce_humidity = $this->ReadPropertyBoolean('with_reduce_humidity');
+        if ($with_reduce_humidity) {
+            $propertyNames = [
+                'outside_temp_varID' => 'Outside temperature',
+                'outside_hum_varID'  => 'Indoor humidity',
+                'indoor_temp_varID'  => 'Indoor temperature',
+                'indoor_hum_varID'   => 'Indoor humidity',
+                'air_pressure_varID' => 'Air pressure',
+            ];
+            foreach ($propertyNames as $propertyName => $desc) {
+                $varID = $this->ReadPropertyInteger($propertyName);
+                if ($this->IsValidID($varID) == false || IPS_VariableExists($varID) == false) {
+                    $this->SendDebug(__FUNCTION__, '"' . $propertyName . '" is undefined or invalid', 0);
+                    $field = $this->Translate($desc);
+                    $r[] = $this->TranslateFormat('To calculate "Reduce humidity possible", Field "{$field}" must be configured', ['{$field}' => $field]);
+                }
+            }
+        }
+
+        $with_risk_of_mold = $this->ReadPropertyBoolean('with_risk_of_mold');
+        if ($with_risk_of_mold) {
+            $propertyNames = [
+                'outside_temp_varID' => 'Outside temperature',
+                'indoor_temp_varID'  => 'Indoor temperature',
+                'indoor_hum_varID'   => 'Indoor humidity',
+            ];
+            foreach ($propertyNames as $propertyName => $desc) {
+                $varID = $this->ReadPropertyInteger($propertyName);
+                if ($this->IsValidID($varID) == false || IPS_VariableExists($varID) == false) {
+                    $this->SendDebug(__FUNCTION__, '"' . $propertyName . '" is undefined or invalid', 0);
+                    $field = $this->Translate($desc);
+                    $r[] = $this->TranslateFormat('To calculate "Risk of mold", Field "{$field}" must be configured', ['{$field}' => $field]);
+                }
+            }
+            $thermal_resistance = $this->ReadPropertyFloat('thermal_resistance');
+            if ($thermal_resistance == 0) {
+                $this->SendDebug(__FUNCTION__, '"thermal_resistance" is undefined or invalid', 0);
+                $field = $this->Translate('Total thermal resistance of outer wall');
+                $r[] = $this->TranslateFormat('To calculate "Risk of mold", Field "{$field}" must be configured', ['{$field}' => $field]);
+            }
         }
 
         return $r;
@@ -103,6 +153,7 @@ class VentilationMonitoring extends IPSModule
 
         $propertyNames = [
             'delay_varID',
+            'pause_varID',
             'lowering_temp_varID',
             'lowering_scriptID',
             'outside_temp_varID',
@@ -151,6 +202,27 @@ class VentilationMonitoring extends IPSModule
                         $oid = $var['value'];
                         if (in_array($oid, $varIDs) == false) {
                             $varIDs[] = $oid;
+                        }
+                    }
+                }
+            }
+        }
+
+        $durations = json_decode($this->ReadPropertyString('durations'), true);
+        if ($durations != false) {
+            foreach ($durations as $duration) {
+                if (isset($duration['condition']['rules']['variable'])) {
+                    $vars = $duration['condition']['rules']['variable'];
+                    foreach ($vars as $var) {
+                        $variableID = $var['variableID'];
+                        if (in_array($variableID, $varIDs) == false) {
+                            $varIDs[] = $variableID;
+                        }
+                        if ($this->GetArrayElem($var, 'type', 0) == 1 /* compare with variable */) {
+                            $oid = $var['value'];
+                            if (in_array($oid, $varIDs) == false) {
+                                $varIDs[] = $oid;
+                            }
                         }
                     }
                 }
@@ -208,10 +280,12 @@ class VentilationMonitoring extends IPSModule
         $this->MaintainVariable('TriggerTime', $this->Translate('Triggering time'), VARIABLETYPE_INTEGER, '~UnixTimestamp', $vpos++, true);
 
         $with_calculations = $this->ReadPropertyBoolean('with_calculations');
+        $with_reduce_humidity = $this->ReadPropertyBoolean('with_reduce_humidity');
+        $with_risk_of_mold = $this->ReadPropertyBoolean('with_risk_of_mold');
 
         $vpos = 10;
-        $this->MaintainVariable('ReduceHumidityPossible', $this->Translate('Reduce humidity possible'), VARIABLETYPE_BOOLEAN, 'VentilationMonitoring.ReduceHumidityPossible', $vpos++, true);
-        $this->MaintainVariable('RiskOfMold', $this->Translate('Risk of mold'), VARIABLETYPE_INTEGER, 'VentilationMonitoring.RiskOfMold', $vpos++, true);
+        $this->MaintainVariable('ReduceHumidityPossible', $this->Translate('Reduce humidity possible'), VARIABLETYPE_BOOLEAN, 'VentilationMonitoring.ReduceHumidityPossible', $vpos++, $with_reduce_humidity);
+        $this->MaintainVariable('RiskOfMold', $this->Translate('Risk of mold'), VARIABLETYPE_INTEGER, 'VentilationMonitoring.RiskOfMold', $vpos++, $with_risk_of_mold);
 
         $vpos = 20;
         $with_calculations = $this->ReadPropertyBoolean('with_calculations');
@@ -287,6 +361,10 @@ class VentilationMonitoring extends IPSModule
             'expanded' => false,
             'items'    => [
                 [
+                    'type'      => 'Label',
+                    'caption'   => 'Initial delay',
+                ],
+                [
                     'type'    => 'RowLayout',
                     'items'   => [
                         [
@@ -317,7 +395,6 @@ class VentilationMonitoring extends IPSModule
                             'width'              => '500px',
                         ],
                     ],
-                    'caption'  => 'Initial delay',
                 ],
                 [
                     'name'     => 'lowering_mode',
@@ -400,12 +477,13 @@ class VentilationMonitoring extends IPSModule
                     'caption'  => 'Target variables',
                 ],
                 [
-                    'name'     => 'durations',
-                    'type'     => 'List',
-                    'rowCount' => 3,
-                    'add'      => true,
-                    'delete'   => true,
-                    'columns'  => [
+                    'name'        => 'durations',
+                    'type'        => 'List',
+                    'rowCount'    => 3,
+                    'add'         => true,
+                    'delete'      => true,
+                    'changeOrder' => true,
+                    'columns'     => [
                         [
                             'name'    => 'max_temp',
                             'add'     => 18,
@@ -418,6 +496,16 @@ class VentilationMonitoring extends IPSModule
                             ],
                             'width'   => '200px',
                             'caption' => 'Upper temperature limit',
+                        ],
+                        [
+                            'name'    => 'condition',
+                            'add'     => '',
+                            'edit'    => [
+                                'type'    => 'SelectCondition',
+                                'multi'   => true,
+                            ],
+                            'width'   => 'auto',
+                            'caption' => 'Complex condition',
                         ],
                         [
                             'name'    => 'open',
@@ -456,14 +544,91 @@ class VentilationMonitoring extends IPSModule
                     ],
                     'caption'  => 'Duration of ventilation until messaging',
                 ],
+            ],
+            'caption' => 'Lower temperatur',
+        ];
+
+        $formElements[] = [
+            'type'     => 'ExpansionPanel',
+            'expanded' => false,
+            'items'    => [
                 [
                     'name'      => 'notice_script',
                     'type'      => 'ScriptEditor',
                     'rowCount'  => 10,
                     'caption'   => 'Script to call after the specified duration has elapsed',
                 ],
+                [
+                    'type'      => 'Label',
+                    'caption'   => 'Pause until repeated notification',
+                ],
+                [
+                    'type'    => 'RowLayout',
+                    'items'   => [
+                        [
+                            'name'               => 'pause_timeunit',
+                            'type'               => 'Select',
+                            'options'            => $this->GetTimeunitAsOptions(),
+                            'width'              => '100px',
+                            'caption'            => 'Time unit',
+                        ],
+                        [
+                            'name'               => 'pause_value',
+                            'type'               => 'NumberSpinner',
+                            'minimum'            => 0,
+                            'width'              => '100px',
+                            'caption'            => 'Fix value',
+                        ],
+                        [
+                            'type'               => 'Label',
+                            'bold'               => true,
+                            'width'              => '50px',
+                            'caption'            => 'or',
+                        ],
+                        [
+                            'name'               => 'pause_varID',
+                            'type'               => 'SelectVariable',
+                            'validVariableTypes' => [VARIABLETYPE_INTEGER],
+                            'caption'            => 'Variable',
+                            'width'              => '500px',
+                        ],
+                    ],
+                ],
             ],
-            'caption' => 'Lower temperatur',
+            'caption' => 'Notification',
+        ];
+
+        $formElements[] = [
+            'type'     => 'ExpansionPanel',
+            'expanded' => false,
+            'items'    => [
+                [
+                    'name'    => 'with_reduce_humidity',
+                    'type'    => 'CheckBox',
+                    'caption' => 'Provide information for "Reduce humidity possible"',
+                ],
+                [
+                    'type'    => 'Label',
+                ],
+                [
+                    'name'    => 'with_risk_of_mold',
+                    'type'    => 'CheckBox',
+                    'caption' => 'Provide information for "Risk of mold"',
+                ],
+                [
+                    'name'    => 'thermal_resistance',
+                    'type'    => 'NumberSpinner',
+                    'digits'  => 3,
+                    'minimum' => 0,
+                    'suffix'  => 'm²*K/W',
+                    'caption' => 'Total thermal resistance of outer wall'
+                ],
+                [
+                    'type'    => 'Label',
+                    'caption' => 'See also in the expert area',
+                ],
+            ],
+            'caption' => 'Humidity',
         ];
 
         $formElements[] = [
@@ -511,19 +676,10 @@ class VentilationMonitoring extends IPSModule
                 [
                     'name'    => 'with_calculations',
                     'type'    => 'CheckBox',
-                    'caption' => 'Variables for calculated values'
+                    'caption' => 'Create variables for calculated values'
                 ],
             ],
             'caption' => 'Measured values',
-        ];
-
-        $formElements[] = [
-            'name'    => 'thermal_resistance',
-            'type'    => 'NumberSpinner',
-            'digits'  => 3,
-            'minimum' => 0,
-            'suffix'  => 'm²*K/W',
-            'caption' => 'Total thermal resistance of outer wall'
         ];
 
         return $formElements;
@@ -555,16 +711,13 @@ class VentilationMonitoring extends IPSModule
             'OutsideAbsoluteHumidity' => ['Outside absolute humidity', ' g/m³'],
             'OutsideSpecificHumidity' => ['Outside specific humidity', ' g/kg'],
             'OutsideDewpoint'         => ['Outside dewpoint', ' °C'],
-
-            'IndoorTemperature'      => ['Indoor temperature', ' °C'],
-            'IndoorHumidity'         => ['Indoor humidity', ' %'],
-            'IndoorAbsoluteHumidity' => ['Indoor absolute humidity', ' g/m³'],
-            'IndoorSpecificHumidity' => ['Indoor specific humidity', ' g/kg'],
-            'IndoorDewpoint'         => ['Indoor temperature', ' °C'],
-
-            'WallTemperature' => ['Wall temperature on the inner side', ' °C'],
-
-            'AirPressure' => ['Air pressure', ' mbar'],
+            'IndoorTemperature'       => ['Indoor temperature', ' °C'],
+            'IndoorHumidity'          => ['Indoor humidity', ' %'],
+            'IndoorAbsoluteHumidity'  => ['Indoor absolute humidity', ' g/m³'],
+            'IndoorSpecificHumidity'  => ['Indoor specific humidity', ' g/kg'],
+            'IndoorDewpoint'          => ['Indoor temperature', ' °C'],
+            'WallTemperature'         => ['Wall temperature on the inner side', ' °C'],
+            'AirPressure'             => ['Air pressure', ' mbar'],
         ];
 
         $vars_rows = [];
@@ -878,6 +1031,7 @@ class VentilationMonitoring extends IPSModule
             return;
         }
 
+        $this->CalcDuration();
         if (IPS_SemaphoreEnter(self::$semaphoreID, self::$semaphoreTM) == false) {
             $this->SendDebug(__FUNCTION__, 'sempahore ' . self::$semaphoreID . ' is not accessable', 0);
             return;
@@ -888,7 +1042,7 @@ class VentilationMonitoring extends IPSModule
         $conditionS = '';
 
         $open_conditions = $this->ReadPropertyString('open_conditions');
-        if (json_decode($open_conditions, true)) {
+        if (json_decode($open_conditions, true) != false) {
             $is_open = IPS_IsConditionPassing($open_conditions);
             $conditionS .= 'open-conditions ' . ($is_open ? 'passed' : 'blocked');
         } else {
@@ -898,7 +1052,7 @@ class VentilationMonitoring extends IPSModule
         $conditionS .= ', ';
 
         $tilt_conditions = $this->ReadPropertyString('tilt_conditions');
-        if (json_decode($tilt_conditions, true)) {
+        if (json_decode($tilt_conditions, true) != false) {
             $is_tilt = IPS_IsConditionPassing($tilt_conditions);
             $conditionS .= 'tilt-conditions ' . ($is_tilt ? 'passed' : 'blocked');
         } else {
@@ -974,18 +1128,49 @@ class VentilationMonitoring extends IPSModule
         IPS_SemaphoreLeave(self::$semaphoreID);
 
         $values = $this->GetAllValues();
-        $varnames = [
-            'OutsideAbsoluteHumidity',
-            'OutsideDewpoint',
-            'OutsideSpecificHumidity',
-            'IndoorAbsoluteHumidity',
-            'IndoorSpecificHumidity',
-            'IndoorDewpoint',
-            'ReduceHumidityPossible',
-        ];
 
-        foreach ($varnames as $varname) {
-            $this->SetValue($varname, $values[$varname]);
+        $with_calculations = $this->ReadPropertyBoolean('with_calculations');
+        if ($with_calculations) {
+            $varnames = [
+                'OutsideAbsoluteHumidity',
+                'OutsideDewpoint',
+                'OutsideSpecificHumidity',
+                'IndoorAbsoluteHumidity',
+                'IndoorSpecificHumidity',
+                'IndoorDewpoint',
+            ];
+            foreach ($varnames as $varname) {
+                if (isset($values[$varname]) == false) {
+                    continue;
+                }
+                $this->SetValue($varname, $values[$varname]);
+            }
+        }
+
+        $with_reduce_humidity = $this->ReadPropertyBoolean('with_reduce_humidity');
+        if ($with_reduce_humidity) {
+            $varnames = [
+                'ReduceHumidityPossible',
+            ];
+            foreach ($varnames as $varname) {
+                if (isset($values[$varname]) == false) {
+                    continue;
+                }
+                $this->SetValue($varname, $values[$varname]);
+            }
+        }
+
+        $with_risk_of_mold = $this->ReadPropertyBoolean('with_risk_of_mold');
+        if ($with_risk_of_mold) {
+            $varnames = [
+                'RiskOfMold',
+            ];
+            foreach ($varnames as $varname) {
+                if (isset($values[$varname]) == false) {
+                    continue;
+                }
+                $this->SetValue($varname, $values[$varname]);
+            }
         }
     }
 
@@ -1033,15 +1218,36 @@ class VentilationMonitoring extends IPSModule
                             }
                             $params['targets'] = implode(',', $targets);
                         }
-                        @$r = IPS_RunScriptTextWaitEx($script, $params);
+                        @$r = IPS_RunScriptTextWaitEx($notice_script, $params);
                         $this->SendDebug(__FUNCTION__, 'script("...", ' . print_r($params, true) . ' => ' . $r, 0);
-                        if ($r != false) {
-                            $jstate['step'] = 'notified';
+                        $jstate['step'] = 'notified';
+
+                        $sec = 0;
+                        $varID = $this->ReadPropertyInteger('pause_varID');
+                        if (IPS_VariableExists($varID)) {
+                            $tval = GetValueInteger($varID);
+                        } else {
+                            $tval = $this->ReadPropertyInteger('pause_value');
                         }
+                        if ($tval > 0) {
+                            if (isset($jstate['repetition']) == false) {
+                                $jstate['repetition'] = 0;
+                            } else {
+                                $jstate['repetition']++;
+                                $unit = $this->ReadPropertyInteger('pause_timeunit');
+                                $sec = $this->CalcByTimeunit($unit, $tval);
+                                $tvS = $tval . $this->Timeunit2Suffix($unit);
+                                $msg .= ', repeat notification after ' . $tvS;
+                            }
+                        }
+
+                        $this->SendDebug(__FUNCTION__, 'new state=' . print_r($jstate, true), 0);
+                        $this->WriteAttributeString('state', json_encode($jstate));
+                        $this->MaintainTimer('LoopTimer', $sec * 1000);
+                    } else {
+                        $this->SendDebug(__FUNCTION__, 'no notice-script', 0);
+                        $this->MaintainTimer('LoopTimer', 0);
                     }
-                    $this->SendDebug(__FUNCTION__, 'new state=' . print_r($jstate, true), 0);
-                    $this->WriteAttributeString('state', json_encode($jstate));
-                    $this->MaintainTimer('LoopTimer', 0);
                 }
             }
         } else {
@@ -1097,14 +1303,8 @@ class VentilationMonitoring extends IPSModule
 
         $Rges = round($Rges * 1000) / 1000;
 
-        // "The total thermal resistance of the outer wall is": "Der Gesamtwärmewiderstand der Aussenwand beträgt",
         $msg = $this->Translate('The total thermal resistance of the wall is') . ' ' . $Rges . ' m²*K/W';
         $this->PopupMessage($msg);
-    }
-
-    private function cmp_durations($a, $b)
-    {
-        return ($a['max_temp'] < $b['max_temp']) ? -11 : 1;
     }
 
     private function CalcDuration()
@@ -1115,22 +1315,37 @@ class VentilationMonitoring extends IPSModule
 
         $durations = json_decode($this->ReadPropertyString('durations'), true);
         if ($durations != false) {
-            usort($durations, [__CLASS__, 'cmp_durations']);
             $varID = $this->ReadPropertyInteger('outside_temp_varID');
+            $match = false;
             if (IPS_VariableExists($varID)) {
                 $temp = GetValueFloat($varID);
-                foreach ($durations as $duration) {
-                    if ($temp < $duration['max_temp']) {
-                        $value = $duration[$state];
-                        $sec = $this->CalcByTimeunit($duration['duration_timeunit'], $value);
-                        break;
+            }
+            foreach ($durations as $duration) {
+                $passed = true;
+                if ($passed) {
+                    $condition = $duration['condition'];
+                    $this->SendDebug(__FUNCTION__, 'condition=' . $condition, 0);
+                    if (json_decode($condition, true) != false) {
+                        $passed = IPS_IsConditionPassing($condition);
+                        $this->SendDebug(__FUNCTION__, 'condition passed=' . $this->bool2str($passed), 0);
                     }
                 }
-            } else {
+                if ($passed) {
+                    if (IPS_VariableExists($varID)) {
+                        $passed = $temp <= $duration['max_temp'];
+                        $this->SendDebug(__FUNCTION__, 'max_temp=' . $duration['max_temp'] . ', passed=' . $this->bool2str($passed), 0);
+                    }
+                }
+                if ($passed) {
+                    $sec = $this->CalcByTimeunit($duration['duration_timeunit'], $duration[$state]);
+                    $match = true;
+                    break;
+                }
+            }
+            if ($match == false) {
                 if (count($durations) > 0) {
                     $duration = $durations[0];
-                    $value = $duration[$state];
-                    $sec = $this->CalcByTimeunit($duration['duration_timeunit'], $value);
+                    $sec = $this->CalcByTimeunit($duration['duration_timeunit'], $duration[$state]);
                 }
             }
         }
@@ -1187,10 +1402,10 @@ class VentilationMonitoring extends IPSModule
                 if (IPS_VariableExists($air_pressure_varID)) {
                     $indoor_specific_hum = $this->CalcSpecificHumidity($indoor_temp, $indoor_hum, $air_pressure);
                     $values['IndoorSpecificHumidity'] = $indoor_specific_hum;
-                }
 
-                $reduce_possible = $outside_specific_hum <= ($indoor_specific_hum - 0.8 /* Hysterese */);
-                $values['ReduceHumidityPossible'] = $reduce_possible;
+                    $reduce_possible = $outside_specific_hum <= ($indoor_specific_hum - 0.8 /* Hysterese */);
+                    $values['ReduceHumidityPossible'] = $reduce_possible;
+                }
 
                 if ($thermal_resistance > 0) {
                     $wall_temp = $indoor_temp + ((0.13 / $thermal_resistance) * ($outside_temp - $indoor_temp));

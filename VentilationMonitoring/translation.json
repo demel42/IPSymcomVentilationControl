@@ -5,6 +5,10 @@
 
 			"__function__": "CheckConfiguration",
 			"Minimum one condition (open/tiled) must be defined": "Minimal eine Bedingung (offen/gekippt) muss definiert werden",
+			"To calculate \"Reduce humidity possible\", Field \"{$field}\" must be configured":
+				"Um \"Feuchtigkeit reduzieren möglich\" zu berechnen, muss das Feld \"{$field}\" konfiguriert sein",
+			"To calculate \"Risk of mold\", Field \"{$field}\" must be configured":
+				"Um \"Risiko einer Schimmelbildung\" zu berechnen, muss das Feld \"{$field}\" konfiguriert sein",
 
 			"__properties__": "",
 			"Disable instance": "Instanz deaktivieren",
@@ -30,10 +34,20 @@
 			"Variable": "Variable",
 
 			"Upper temperature limit": "Temperatur Obergrenze",
+			"Complex condition": "Komplexe Bedingungen",
 			"Duration at \"open\"": "Dauer bei \"offen\"",
 			"Duration at \"tilt\"": "Dauer bei \"gekippt\"",
 			"Duration of ventilation until messaging": "Dauer der Lüftung bis zur Benachrichtigung",
+
+			"Notification": "Benachrichtigung",
 			"Script to call after the specified duration has elapsed": "Script zum Aufruf nach Ablauf der angegebenen Dauer",
+			"Pause until repeated notification": "Pause bis zur wiederholten Benachrichtigung",
+
+			"Humidity": "Luftfeuchtigkeit",
+			"Provide information for \"Reduce humidity possible\"": "Informationen für \"Feuchtigkeit reduzieren möglich\" bereitstellen",
+			"Total thermal resistance of outer wall": "Gesamtwärmeübergangswiderstand der Außenwand",
+			"See also in the expert area": "Siehe auch im Experten-Bereich",
+			"Provide information for \"Risk of mold\"": "Informationen für \"Risiko einer Schimmelbildung\" bereitstellen",
 
 			"Measured values": "Messwerte",
 			"Outside temperature": "Aussentemperatur",
@@ -43,10 +57,12 @@
 			"Air pressure": "Luftdruck",
 			"Wall temperature on the inner side": "Temperatur auf der Innenseite der Aussenwand",
 
-			"Total thermal resistance of outer wall": "Gesamtwärmeübergangswiderstand der Außenwand",
+			"Create variables for calculated values": "Variablen für berechnete Werte anlegen",
 
 			"__actions__": "",
 			"Check conditions": "Bedingungen prüfen",
+
+			"internal informations": "interne Informationen",
 
 			"Calculate thermal resistance": "Wärmewiderstand berechnen",
 			"Outside temperature": "Außentemperatur",
