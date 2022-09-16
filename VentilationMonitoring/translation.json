@@ -16,6 +16,7 @@
 			"Condition for open window detection": "Bedingung zur Erkennung eines offenen Fensters",
 			"Condition for tilt window detection": "Bedingung zur Erkennung eines gekippten Fensters",
 
+			"Variable to control the ventilation monitoring": "Variable zur Kontrolle der Lüftungsüberwachung",
 			"Initial delay": "Start-Verzögerung",
 			"Time unit": "Zeiteinheit",
 			"Fix value": "fester Wert",
@@ -46,6 +47,7 @@
 			"Humidity": "Luftfeuchtigkeit",
 			"Provide information for \"Reduce humidity possible\"": "Informationen für \"Feuchtigkeit reduzieren möglich\" bereitstellen",
 			"Total thermal resistance of outer wall": "Gesamtwärmeübergangswiderstand der Außenwand",
+			"Minimum of air humidity for mold warning": "Minimale Luftfeuchte für Schimmel-Warnung",
 			"See also in the expert area": "Siehe auch im Experten-Bereich",
 			"Provide information for \"Risk of mold\"": "Informationen für \"Risiko einer Schimmelbildung\" bereitstellen",
 
@@ -76,6 +78,7 @@
 			"__variables__": "",
 			"Closure state": "Verschluss-Zustand",
 			"Triggering time": "Auslöse-Zeitpunkt",
+			"Monitor ventilation": "Lüftung überwachen",
 
 			"Outside absolute humidity": "Absolute Luftfeuchtigkeit (aussen)",
 			"Outside specific humidity": "Spezifische Luftfeuchtigkeit (aussen)",

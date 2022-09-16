@@ -35,6 +35,8 @@ class VentilationMonitoring extends IPSModule
         $this->RegisterPropertyString('open_conditions', json_encode([]));
         $this->RegisterPropertyString('tilt_conditions', json_encode([]));
 
+        $this->RegisterPropertyBoolean('monitoring_control', false);
+
         $this->RegisterPropertyInteger('delay_value', 30);
         $this->RegisterPropertyInteger('delay_varID', 0);
         $this->RegisterPropertyInteger('delay_timeunit', self::$TIMEUNIT_SECONDS);
@@ -65,6 +67,8 @@ class VentilationMonitoring extends IPSModule
         $this->RegisterPropertyInteger('air_pressure_varID', 0);
 
         $this->RegisterPropertyFloat('thermal_resistance', 0);
+
+        $this->RegisterPropertyFloat('mold_hum_min', 60);
 
         $this->RegisterAttributeString('UpdateInfo', '');
 
@@ -279,6 +283,12 @@ class VentilationMonitoring extends IPSModule
 
         $this->MaintainVariable('TriggerTime', $this->Translate('Triggering time'), VARIABLETYPE_INTEGER, '~UnixTimestamp', $vpos++, true);
 
+        $monitoring_control = $this->ReadPropertyBoolean('monitoring_control');
+        $this->MaintainVariable('MonitorVentilation', $this->Translate('Monitor ventilation'), VARIABLETYPE_BOOLEAN, '~Switch', $vpos++, $monitoring_control);
+        if ($monitoring_control) {
+            $this->MaintainAction('MonitorVentilation', true);
+        }
+
         $with_calculations = $this->ReadPropertyBoolean('with_calculations');
         $with_reduce_humidity = $this->ReadPropertyBoolean('with_reduce_humidity');
         $with_risk_of_mold = $this->ReadPropertyBoolean('with_risk_of_mold');
@@ -360,6 +370,11 @@ class VentilationMonitoring extends IPSModule
             'type'     => 'ExpansionPanel',
             'expanded' => false,
             'items'    => [
+                [
+                    'name'    => 'monitoring_control',
+                    'type'    => 'CheckBox',
+                    'caption' => 'Variable to control the ventilation monitoring',
+                ],
                 [
                     'type'      => 'Label',
                     'caption'   => 'Initial delay',
@@ -621,7 +636,16 @@ class VentilationMonitoring extends IPSModule
                     'digits'  => 3,
                     'minimum' => 0,
                     'suffix'  => 'm²*K/W',
-                    'caption' => 'Total thermal resistance of outer wall'
+                    'caption' => 'Total thermal resistance of outer wall',
+                ],
+                [
+                    'name'    => 'mold_hum_min',
+                    'type'    => 'NumberSpinner',
+                    'digits'  => 0,
+                    'minimum' => 0,
+                    'maximum' => 100,
+                    'suffix'  => '%',
+                    'caption' => 'Minimum of air humidity for mold warning',
                 ],
                 [
                     'type'    => 'Label',
@@ -902,6 +926,10 @@ class VentilationMonitoring extends IPSModule
 
         $r = false;
         switch ($ident) {
+            case 'MonitorVentilation':
+                $this->SetValue($ident, $value);
+                $this->CheckConditions();
+                break;
             default:
                 $this->SendDebug(__FUNCTION__, 'invalid ident ' . $ident, 0);
                 break;
@@ -1067,62 +1095,78 @@ class VentilationMonitoring extends IPSModule
             $closureState = self::$CLOSURE_STATE_CLOSE;
         }
 
-        $this->SendDebug(__FUNCTION__, $conditionS . ' => closureState=' . $closureState, 0);
-
         $oldClosureState = $this->GetValue('ClosureState');
-        if ($closureState != $oldClosureState) {
-            $oldClosureStateS = $this->GetValueFormatted('ClosureState');
+        $oldTriggerTime = $this->GetValue('TriggerTime');
 
-            $this->SetValue('ClosureState', $closureState);
-            $this->SetValue('TriggerTime', $closureState == self::$CLOSURE_STATE_CLOSE ? 0 : time());
+        $loweringEnabled = $this->GetValue('MonitorVentilation');
 
-            $closureStateS = $this->GetValueFormatted('ClosureState');
-            $conditionS .= ': closureState=' . $closureStateS . ' (old=' . $oldClosureStateS . ')';
+        $this->SendDebug(__FUNCTION__, $conditionS . ' => closureState=' . $closureState . ', enabled=' . $this->bool2str($loweringEnabled), 0);
 
-            $jstate = json_decode($this->ReadAttributeString('state'), true);
-            $this->SendDebug(__FUNCTION__, 'old state=' . print_r($jstate, true), 0);
-            if ($closureState != self::$CLOSURE_STATE_CLOSE) {
-                $varID = $this->ReadPropertyInteger('delay_varID');
-                if (IPS_VariableExists($varID)) {
-                    $tval = GetValueInteger($varID);
-                } else {
-                    $tval = $this->ReadPropertyInteger('delay_value');
-                }
-                if ($tval > 0) {
-                    $unit = $this->ReadPropertyInteger('delay_timeunit');
-                    $sec = $this->CalcByTimeunit($unit, $tval);
-                    $tvS = $tval . $this->Timeunit2Suffix($unit);
-                    $msg = $conditionS . ', started with delay of ' . $tvS;
-                    $jstate['step'] = 'delay';
-                    $this->SendDebug(__FUNCTION__, 'new state=' . print_r($jstate, true), 0);
-                    $this->WriteAttributeString('state', json_encode($jstate));
-                    $this->MaintainTimer('LoopTimer', $sec * 1000);
-                } else {
-                    $duration = $this->CalcDuration();
-                    if ($duration > 0) {
-                        $msg = $conditionS . ', started ventilation phase of ' . $duration . 's';
+        $jstate = json_decode($this->ReadAttributeString('state'), true);
+        $this->SendDebug(__FUNCTION__, 'old state=' . print_r($jstate, true), 0);
+
+        if ($loweringEnabled) {
+            if (($closureState != $oldClosureState) || ($oldTriggerTime == 0 && $closureState != self::$CLOSURE_STATE_CLOSE)) {
+                $oldClosureStateS = $this->GetValueFormatted('ClosureState');
+
+                $this->SetValue('ClosureState', $closureState);
+                $this->SetValue('TriggerTime', $closureState == self::$CLOSURE_STATE_CLOSE ? 0 : time());
+
+                $closureStateS = $this->GetValueFormatted('ClosureState');
+                $conditionS .= ': closureState=' . $closureStateS . ' (old=' . $oldClosureStateS . ')';
+
+                if ($closureState != self::$CLOSURE_STATE_CLOSE) {
+                    $varID = $this->ReadPropertyInteger('delay_varID');
+                    if (IPS_VariableExists($varID)) {
+                        $tval = GetValueInteger($varID);
                     } else {
-                        $msg = $conditionS . ', started ventilation phase with no duration';
+                        $tval = $this->ReadPropertyInteger('delay_value');
                     }
-                    $this->AdjustTemperature(true, $jstate);
-                    $this->SendDebug(__FUNCTION__, 'new state=' . print_r($jstate, true), 0);
-                    $this->WriteAttributeString('state', json_encode($jstate));
-                    $this->MaintainTimer('LoopTimer', $duration * 1000);
-                }
-            } else {
-                if (isset($jstate['step']) == false || $jstate['step'] != 'inactive') {
-                    $msg = $conditionS . ' => stop timer';
-                    $this->AdjustTemperature(false, $jstate);
-                    $this->SendDebug(__FUNCTION__, 'new state=' . print_r($jstate, true), 0);
-                    $this->WriteAttributeString('state', json_encode($jstate));
+                    if ($tval > 0) {
+                        $unit = $this->ReadPropertyInteger('delay_timeunit');
+                        $sec = $this->CalcByTimeunit($unit, $tval);
+                        $tvS = $tval . $this->Timeunit2Suffix($unit);
+                        $msg = $conditionS . ', started with delay of ' . $tvS;
+                        $jstate['step'] = 'delay';
+                        $this->SendDebug(__FUNCTION__, 'new state=' . print_r($jstate, true), 0);
+                        $this->WriteAttributeString('state', json_encode($jstate));
+                        $this->MaintainTimer('LoopTimer', $sec * 1000);
+                    } else {
+                        $duration = $this->CalcDuration();
+                        if ($duration > 0) {
+                            $msg = $conditionS . ', started ventilation phase of ' . $duration . 's';
+                        } else {
+                            $msg = $conditionS . ', started ventilation phase with no duration';
+                        }
+                        $this->AdjustTemperature(true, $jstate);
+                        $this->SendDebug(__FUNCTION__, 'new state=' . print_r($jstate, true), 0);
+                        $this->WriteAttributeString('state', json_encode($jstate));
+                        $this->MaintainTimer('LoopTimer', $duration * 1000);
+                    }
                 } else {
-                    $msg = $conditionS . ' => no timer';
+                    if (isset($jstate['step']) == false || $jstate['step'] != 'inactive') {
+                        $msg = $conditionS . ' => stop timer';
+                        $this->AdjustTemperature(false, $jstate);
+                        $this->SendDebug(__FUNCTION__, 'new state=' . print_r($jstate, true), 0);
+                        $this->WriteAttributeString('state', json_encode($jstate));
+                    } else {
+                        $msg = $conditionS . ' => no timer';
+                    }
+                    $this->MaintainTimer('LoopTimer', 0);
                 }
+
+                $this->SendDebug(__FUNCTION__, $msg, 0);
+                $this->AddModuleActivity($msg);
+            }
+        } else {
+            if ($oldTriggerTime) {
+                $this->SetValue('TriggerTime', 0);
+                $msg = $conditionS . ' => stop timer';
+                $this->AdjustTemperature(false, $jstate);
+                $this->SendDebug(__FUNCTION__, 'new state=' . print_r($jstate, true), 0);
+                $this->WriteAttributeString('state', json_encode($jstate));
                 $this->MaintainTimer('LoopTimer', 0);
             }
-
-            $this->SendDebug(__FUNCTION__, $msg, 0);
-            $this->AddModuleActivity($msg);
         }
 
         IPS_SemaphoreLeave(self::$semaphoreID);
@@ -1364,6 +1408,7 @@ class VentilationMonitoring extends IPSModule
         $indoor_hum_varID = $this->ReadPropertyInteger('indoor_hum_varID');
         $air_pressure_varID = $this->ReadPropertyInteger('air_pressure_varID');
         $thermal_resistance = $this->ReadPropertyFloat('thermal_resistance');
+        $mold_hum_min = $this->ReadPropertyFloat('mold_hum_min');
 
         if (IPS_VariableExists($outside_temp_varID) && IPS_VariableExists($outside_hum_varID)) {
             $outside_temp = GetValueFloat($outside_temp_varID);
@@ -1411,13 +1456,17 @@ class VentilationMonitoring extends IPSModule
                     $wall_temp = $indoor_temp + ((0.13 / $thermal_resistance) * ($outside_temp - $indoor_temp));
                     $values['WallTemperature'] = $wall_temp;
 
-                    $tdif = $wall_temp - $indoor_dewpoint;
-                    if ($tdif > 2) {
-                        $mold_risk = self::$RISK_OF_MOLD_NONE;
-                    } elseif ($tdif > 1) {
-                        $mold_risk = self::$RISK_OF_MOLD_WARN;
+                    if ($mold_hum_min == 0 || $indoor_hum > $mold_hum_min) {
+                        $tdif = $wall_temp - $indoor_dewpoint;
+                        if ($tdif > 2) {
+                            $mold_risk = self::$RISK_OF_MOLD_NONE;
+                        } elseif ($tdif > 1) {
+                            $mold_risk = self::$RISK_OF_MOLD_WARN;
+                        } else {
+                            $mold_risk = self::$RISK_OF_MOLD_ALARM;
+                        }
                     } else {
-                        $mold_risk = self::$RISK_OF_MOLD_ALARM;
+                        $mold_risk = self::$RISK_OF_MOLD_NONE;
                     }
                     $values['RiskOfMold'] = $mold_risk;
                 }

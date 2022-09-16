@@ -16,6 +16,22 @@
 
 ## 1. Funktionsumfang
 
+Das Modul beschäftigt sich mit der Überwachung der Lüftung von Räumen in verschiedenen Aspekten
+
+- Temperauturabsenkung
+  Beim Lüften sollte man die Temperatur absenken um den Energieverlust zu begrenzen. Hierzu kann man Sensoren am Fenster benutzen um die Öffnung zu überwachen. Homamatic bietet zwar die Möglichkeit, die Fenstersensoren mit den Thermostaten zu verknüpfen, um eine solche Absenkung automatisch durchzuführen, das stösst aber auf einige Unschönheiten, z.B. die Absenkung erfolgt sofort, wenn der Sensor ein offenens Fenster meldet - bedeutet, das ggfsl das Ventil ständig auf und zu geht. Die Konfiguration dezentral in den jeweiligen Aktoren und auch nicht so einfach beeinflussbar. Zudem wird's kompliziert, wenn man mehr als ein Fenster in einem Raum hat bzw. mehr als einen Themostaten. Geht alles, wollte ich aber lieber im IPS zusammen steuern.
+Ich eis auch nicht, ob alle diversen Steuersysteme eine solche Verknüfung ermöglichen; geht aber sicherlich eher nicht, wenn die beteiligten Komponenten nicht "aus einem Guß" sind.
+
+- Meldung, wenn genug gelüftet wurde
+
+- Luftfeuchtigkeit
+  ein Lüften zur Verringerung der Luftfeuchtigkeit macht ja nur Sinn, wenn die Luftfeuchtigkeit draussen um einiges kliner ist als drinnen. 
+  Genauer gesagt, geht es nicht um die relative Liuftfeuchtigkeit sondern um die absolute (in g/m³ Luft) bzw. spezifische ( in g/kg Luft) Feuchte. Z.b. bei aussen 30°C / 80 % und innen 23°C / 65 % sind aussen 21.1 g Wasser/kg Luft und innen 11.3 g Wasser/kg Luft -> ein Lüften würde also die Leuchtigkeit innen erhöhen.
+  Diese Berechnung mach das Modul und stellt das Ergebnis (mit einer gewissen Hysterese) als Variable zur Verfügung. Mit dieser Variable kann man z.B. eine automatische Lüftung steuern.
+
+- Schimmelbildung
+  ein Thema, das spannend wird, wenn man damit ein Problem hat, ist die Gefahr der Schimmelbildung. Das Problem ist nicht nur die Luftfeuchte im Innenraum sondern die Temperatur der Wand… an der sich das Wasser ggfs, niederschlägt. Da man die Temperatur der Wand ja nicht permanent überwachen kann, kann man näherungsweise den Wärmeverlust der Aussenwand (sog. "Gesamtwärmeübergangswiderstand") heranziehen, um die vermutliche Wandtemperatur zu berechnen. ... hier kommt noch ein bisschen Theorie ...
+
 ## 2. Voraussetzungen
 
 - IP-Symcon ab Version 6.0
@@ -41,16 +57,46 @@ alle Funktionen sind über _RequestAction_ der jeweiligen Variablen ansteuerbar
 
 #### Properties
 
-| Eigenschaft               | Typ      | Standardwert | Beschreibung |
-| :------------------------ | :------  | :----------- | :----------- |
-| Instanz deaktivieren      | boolean  | false        | Instanz temporär deaktivieren |
-|                           |          |              | |
+| Eigenschaft                       | Typ      | Standardwert | Beschreibung |
+| :-------------------------------- | :------  | :----------- | :----------- |
+| Instanz deaktivieren              | boolean  | false        | Instanz temporär deaktivieren |
+|                                   |          |              | |
+| Erkennung eines offene Fensters   |          |              | Bedingungen um zu erkennen, ob min. ein Fenster offen ist |
+| Erkennung eines gekippte Fensters |          |              | Bedingungen um zu erkennen, ob min. ein Fenster gekippt ist |
+|                                   |          |              | |
+| Temperaturabsenkung               |          |              | |
+| ... Variable zur Kontrolle        | boolean  | false        | erzeugt eine zusätzliche Variable, mit der die Überwachung temporär deaktiviert werden kann |
+| ... Start-Verzögerung             |          |              | optionale Angabe einer Dauer,bis die Temperatur-Absenkung aktiviert wird |
+| ... Absenkungsmodus               | integer  | 0            | 0=Temperatur setzen, 1=Auslöser setzen, 2=Script aufrufen |
+|     ... Zielwert/Variable         | float    | 12           | Zielwert, an den abgesenkt werden soll |
+|     ... Auslöser-Wert             | integer  | 1            | Wert, der der Trigger annehmen soll |
+|     ... Script                    | integer  | 0            | aufzurufendes Script |
+| ... Dauer bis Benachrichtigung    |          |              | Angabe der Dauer bis zur ersten Benachrichtigung |
+|     ... Temperatur                | float    |              | ermöglicht je nach Temperatur unterschiedliche Zeiträume zu definieren |
+|     ... Komplexe Bedingungen      |          |              | ... und in komplex |
+|     ... Dauer bei "offen"         | integer  |              | Lüftungsdauer bei offenen Fenstern |
+|     ... Dauer bei "gekippt"       | integer  |              | Lüftungsdauer bei gekippten Fenstern
+|                                   |          |              | |
+| Benachrichtigung                  |          |              | |
+| ... Script                        | string   |              | Script zum Aufruf einer Benachrichtigung |
+| ... Pause                         | integer  |              | Pause biß zur erneuten Benachrichtigung (0=nur einmal) |
+|                                   |          |              | |
+| Luftfeuchtigkeit                  |          |              | |
+| ... Lüften möglich                | boolean  |              | Lüften ist sinnvoll möglich, wenn die Feuchte drinnen > draussen |
+| ... Schimmelbildung               | boolean  |              | Hinweis auf die Gefahr einer Schimmelbildung |
+|     ... Gesamtwärmeübergangs...   | float    |              | Wert für den Wärmeverlust einer Aussenwand |
+|     ... min. Feuchte              | float    |              | minimale Luftfeuchte, bei der Schimmel entstehen könnte |
+|                                   |          |              | |
+| Messwerte                         |          |              | verschiedenen Messwerte (Temperatur, Luftfeuchte), die je nach genutzer Funktion benötigt werden |
+| ... Variablen ... anlegen         | boolean  |              | man kann für die berechneten Werte Variablen anlegen lassen, man kann diese aber auch im "Exterten-Bereich" einsehen |
 
 #### Aktionen
 
 | Bezeichnung                | Beschreibung |
 | :------------------------- | :----------- |
+| Bedingungen prüfen         | |
 |                            | |
+| Wärmewiderstand berechnen  | |
 
 ### Variablenprofile
 
@@ -85,5 +131,5 @@ Es werden folgende Variablenprofile angelegt:
 
 ## 7. Versions-Historie
 
-- 0.9 @ 12.09.2022 15:25
+- 1.0 @ 16.09.2022 18:34
   - Initiale Version
