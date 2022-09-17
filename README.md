@@ -18,7 +18,7 @@
 
 Das Modul beschäftigt sich mit der Überwachung der Lüftung von Räumen in verschiedenen Aspekten
 
-- Absenkung der Temperatur
+- Absenkung der Temperatur<br>
   Beim Lüften sollte man die Temperatur absenken um den Energieverlust zu begrenzen. Hierzu kann man Sensoren am Fenster benutzen um die Öffnung zu überwachen.
   Homamatic bietet zwar die Möglichkeit, die Fenstersensoren mit den Thermostaten zu verknüpfen, um eine solche Absenkung automatisch durchzuführen, das stösst
   aber auf einige Unschönheiten, z.B. die Absenkung erfolgt sofort, wenn der Sensor ein offenens Fenster meldet - bedeutet, das ggfs. das Ventil ständig auf
@@ -29,9 +29,9 @@ Das Modul beschäftigt sich mit der Überwachung der Lüftung von Räumen in ver
   Ich weis auch nicht, ob alle diversen Steuersysteme eine solche Verknüfung ermöglichen; geht aber sicherlich eher nicht, wenn die beteiligten Komponenten
   nicht "aus einem Guß" sind.
 
-- (wiederholte) Meldung, wenn lang genug gelüftet wurde
+- (wiederholte) Meldung, wenn lang genug gelüftet wurde<br>
 
-- Luftfeuchtigkeit
+- Luftfeuchtigkeit<br>
   ein Lüften zur Verringerung der Luftfeuchtigkeit macht ja nur Sinn, wenn die Luftfeuchtigkeit draussen um einiges kliner ist als drinnen. 
   Genauer gesagt, geht es nicht um die relative Liuftfeuchtigkeit sondern um die absolute (in g/m³ Luft) bzw. spezifische ( in g/kg Luft) Feuchte.
   Wenn z.B. Aussen 30°C bei 80 % Feuchte und Innen 23°C bei 65 % Feuchte sind, ist der Wassergehalt in der Luft Aussen 21.1 g/kg und Innen 11.3 g/kg
@@ -39,7 +39,7 @@ Das Modul beschäftigt sich mit der Überwachung der Lüftung von Räumen in ver
   Diese Berechnung mach das Modul und stellt das Ergebnis (mit einer gewissen Hysterese) als Variable zur Verfügung.
   Mit Hilfe dieser Variable kann man z.B. eine automatische Lüftung steuern.
 
-- Warnung vor dem Risiko von Schimmelbildung
+- Warnung vor dem Risiko von Schimmelbildung<br>
   ein Thema, das spannend wird, wenn man damit ein Problem hat, ist die Gefahr der Schimmelbildung. Das Problem ist nicht nur die Luftfeuchte im
   Innenraum sondern die Temperatur der Wand… an der sich das Wasser ggfs, niederschlägt. Da man die Temperatur der Wand ja nicht permanent überwachen
   kann, kann man näherungsweise den Wärmeverlust der Aussenwand (sog. "Gesamtwärmeübergangswiderstand") heranziehen, um die vermutliche Wandtemperatur
