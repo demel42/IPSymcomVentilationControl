@@ -568,56 +568,6 @@ class VentilationMonitoring extends IPSModule
             'expanded' => false,
             'items'    => [
                 [
-                    'name'      => 'notice_script',
-                    'type'      => 'ScriptEditor',
-                    'rowCount'  => 10,
-                    'caption'   => 'Script to call after the specified duration has elapsed',
-                ],
-                [
-                    'type'      => 'Label',
-                    'caption'   => 'Pause until repeated notification',
-                ],
-                [
-                    'type'    => 'RowLayout',
-                    'items'   => [
-                        [
-                            'name'               => 'pause_timeunit',
-                            'type'               => 'Select',
-                            'options'            => $this->GetTimeunitAsOptions(),
-                            'width'              => '100px',
-                            'caption'            => 'Time unit',
-                        ],
-                        [
-                            'name'               => 'pause_value',
-                            'type'               => 'NumberSpinner',
-                            'minimum'            => 0,
-                            'width'              => '100px',
-                            'caption'            => 'Fix value',
-                        ],
-                        [
-                            'type'               => 'Label',
-                            'bold'               => true,
-                            'width'              => '50px',
-                            'caption'            => 'or',
-                        ],
-                        [
-                            'name'               => 'pause_varID',
-                            'type'               => 'SelectVariable',
-                            'validVariableTypes' => [VARIABLETYPE_INTEGER],
-                            'caption'            => 'Variable',
-                            'width'              => '500px',
-                        ],
-                    ],
-                ],
-            ],
-            'caption' => 'Notification',
-        ];
-
-        $formElements[] = [
-            'type'     => 'ExpansionPanel',
-            'expanded' => false,
-            'items'    => [
-                [
                     'name'    => 'with_reduce_humidity',
                     'type'    => 'CheckBox',
                     'caption' => 'Provide information for "Reduce humidity possible"',
@@ -704,6 +654,56 @@ class VentilationMonitoring extends IPSModule
                 ],
             ],
             'caption' => 'Measured values',
+        ];
+
+        $formElements[] = [
+            'type'     => 'ExpansionPanel',
+            'expanded' => false,
+            'items'    => [
+                [
+                    'name'      => 'notice_script',
+                    'type'      => 'ScriptEditor',
+                    'rowCount'  => 10,
+                    'caption'   => 'Script to call after the specified duration has elapsed',
+                ],
+                [
+                    'type'      => 'Label',
+                    'caption'   => 'Pause until repeated notification',
+                ],
+                [
+                    'type'    => 'RowLayout',
+                    'items'   => [
+                        [
+                            'name'               => 'pause_timeunit',
+                            'type'               => 'Select',
+                            'options'            => $this->GetTimeunitAsOptions(),
+                            'width'              => '100px',
+                            'caption'            => 'Time unit',
+                        ],
+                        [
+                            'name'               => 'pause_value',
+                            'type'               => 'NumberSpinner',
+                            'minimum'            => 0,
+                            'width'              => '100px',
+                            'caption'            => 'Fix value',
+                        ],
+                        [
+                            'type'               => 'Label',
+                            'bold'               => true,
+                            'width'              => '50px',
+                            'caption'            => 'or',
+                        ],
+                        [
+                            'name'               => 'pause_varID',
+                            'type'               => 'SelectVariable',
+                            'validVariableTypes' => [VARIABLETYPE_INTEGER],
+                            'caption'            => 'Variable',
+                            'width'              => '500px',
+                        ],
+                    ],
+                ],
+            ],
+            'caption' => 'Notification',
         ];
 
         return $formElements;
@@ -1098,7 +1098,8 @@ class VentilationMonitoring extends IPSModule
         $oldClosureState = $this->GetValue('ClosureState');
         $oldTriggerTime = $this->GetValue('TriggerTime');
 
-        $loweringEnabled = $this->GetValue('MonitorVentilation');
+        $monitoring_control = $this->ReadPropertyBoolean('monitoring_control');
+        $loweringEnabled = $monitoring_control ? $this->GetValue('MonitorVentilation') : true;
 
         $this->SendDebug(__FUNCTION__, $conditionS . ' => closureState=' . $closureState . ', enabled=' . $this->bool2str($loweringEnabled), 0);
 
@@ -1159,6 +1160,7 @@ class VentilationMonitoring extends IPSModule
                 $this->AddModuleActivity($msg);
             }
         } else {
+            $this->SetValue('ClosureState', $closureState);
             if ($oldTriggerTime) {
                 $this->SetValue('TriggerTime', 0);
                 $msg = $conditionS . ' => stop timer';
