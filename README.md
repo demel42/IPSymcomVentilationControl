@@ -18,19 +18,34 @@
 
 Das Modul beschäftigt sich mit der Überwachung der Lüftung von Räumen in verschiedenen Aspekten
 
-- Temperauturabsenkung
-  Beim Lüften sollte man die Temperatur absenken um den Energieverlust zu begrenzen. Hierzu kann man Sensoren am Fenster benutzen um die Öffnung zu überwachen. Homamatic bietet zwar die Möglichkeit, die Fenstersensoren mit den Thermostaten zu verknüpfen, um eine solche Absenkung automatisch durchzuführen, das stösst aber auf einige Unschönheiten, z.B. die Absenkung erfolgt sofort, wenn der Sensor ein offenens Fenster meldet - bedeutet, das ggfsl das Ventil ständig auf und zu geht. Die Konfiguration dezentral in den jeweiligen Aktoren und auch nicht so einfach beeinflussbar. Zudem wird's kompliziert, wenn man mehr als ein Fenster in einem Raum hat bzw. mehr als einen Themostaten. Geht alles, wollte ich aber lieber im IPS zusammen steuern.
-Ich eis auch nicht, ob alle diversen Steuersysteme eine solche Verknüfung ermöglichen; geht aber sicherlich eher nicht, wenn die beteiligten Komponenten nicht "aus einem Guß" sind.
+- Absenkung der Temperatur
+  Beim Lüften sollte man die Temperatur absenken um den Energieverlust zu begrenzen. Hierzu kann man Sensoren am Fenster benutzen um die Öffnung zu überwachen.
+  Homamatic bietet zwar die Möglichkeit, die Fenstersensoren mit den Thermostaten zu verknüpfen, um eine solche Absenkung automatisch durchzuführen, das stösst
+  aber auf einige Unschönheiten, z.B. die Absenkung erfolgt sofort, wenn der Sensor ein offenens Fenster meldet - bedeutet, das ggfs. das Ventil ständig auf
+  und zu geht.
+  Die Konfiguration erfolgt in Homematic  dezentral in den jeweiligen Aktoren und auch nicht so einfach beeinflussbar.
+  Zudem wird's kompliziert, wenn man mehr als ein Fenster in einem Raum hat bzw. mehr als einen Themostaten.
+  Geht alles, wollte ich aber lieber im IPS zusammen steuern.
+  Ich weis auch nicht, ob alle diversen Steuersysteme eine solche Verknüfung ermöglichen; geht aber sicherlich eher nicht, wenn die beteiligten Komponenten
+  nicht "aus einem Guß" sind.
 
-- Meldung, wenn genug gelüftet wurde
+- (wiederholte) Meldung, wenn lang genug gelüftet wurde
 
 - Luftfeuchtigkeit
   ein Lüften zur Verringerung der Luftfeuchtigkeit macht ja nur Sinn, wenn die Luftfeuchtigkeit draussen um einiges kliner ist als drinnen. 
-  Genauer gesagt, geht es nicht um die relative Liuftfeuchtigkeit sondern um die absolute (in g/m³ Luft) bzw. spezifische ( in g/kg Luft) Feuchte. Z.b. bei aussen 30°C / 80 % und innen 23°C / 65 % sind aussen 21.1 g Wasser/kg Luft und innen 11.3 g Wasser/kg Luft -> ein Lüften würde also die Leuchtigkeit innen erhöhen.
-  Diese Berechnung mach das Modul und stellt das Ergebnis (mit einer gewissen Hysterese) als Variable zur Verfügung. Mit dieser Variable kann man z.B. eine automatische Lüftung steuern.
+  Genauer gesagt, geht es nicht um die relative Liuftfeuchtigkeit sondern um die absolute (in g/m³ Luft) bzw. spezifische ( in g/kg Luft) Feuchte.
+  Wenn z.B. Aussen 30°C bei 80 % Feuchte und Innen 23°C bei 65 % Feuchte sind, ist der Wassergehalt in der Luft Aussen 21.1 g/kg und Innen 11.3 g/kg
+  -> ein Lüften würde also die Leuchtigkeit innen erhöhen.
+  Diese Berechnung mach das Modul und stellt das Ergebnis (mit einer gewissen Hysterese) als Variable zur Verfügung.
+  Mit Hilfe dieser Variable kann man z.B. eine automatische Lüftung steuern.
 
-- Schimmelbildung
-  ein Thema, das spannend wird, wenn man damit ein Problem hat, ist die Gefahr der Schimmelbildung. Das Problem ist nicht nur die Luftfeuchte im Innenraum sondern die Temperatur der Wand… an der sich das Wasser ggfs, niederschlägt. Da man die Temperatur der Wand ja nicht permanent überwachen kann, kann man näherungsweise den Wärmeverlust der Aussenwand (sog. "Gesamtwärmeübergangswiderstand") heranziehen, um die vermutliche Wandtemperatur zu berechnen. ... hier kommt noch ein bisschen Theorie ...
+- Warnung vor dem Risiko von Schimmelbildung
+  ein Thema, das spannend wird, wenn man damit ein Problem hat, ist die Gefahr der Schimmelbildung. Das Problem ist nicht nur die Luftfeuchte im
+  Innenraum sondern die Temperatur der Wand… an der sich das Wasser ggfs, niederschlägt. Da man die Temperatur der Wand ja nicht permanent überwachen
+  kann, kann man näherungsweise den Wärmeverlust der Aussenwand (sog. "Gesamtwärmeübergangswiderstand") heranziehen, um die vermutliche Wandtemperatur
+  zu berechnen.
+  <br>... hier kommt noch ein bisschen Theorie ...<br>
+  Dieser Teil ist noch experimentell und muss noch weiter verprüft werden!
 
 ## 2. Voraussetzungen
 
