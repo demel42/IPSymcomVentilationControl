@@ -56,7 +56,7 @@ Das Modul beschäftigt sich mit der Überwachung der Lüftung von Räumen in ver
 ### a. Installation des Moduls
 
 Im [Module Store](https://www.symcon.de/service/dokumentation/komponenten/verwaltungskonsole/module-store/) ist das Modul
-unter dem Suchbegriff *VentilationMonitoring* zu finden.<br>
+unter dem Suchbegriff *Lüftungsüberwachung* zu finden.<br>
 Alternativ kann das Modul über [Module Control](https://www.symcon.de/service/dokumentation/modulreferenz/module-control/)
 unter Angabe der URL `https://github.com/demel42/IPSymconVentilationMonitoring.git` installiert werden.
 
