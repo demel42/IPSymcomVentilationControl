@@ -161,7 +161,7 @@ Es werden folgende Variablenprofile angelegt:
 ## 7. Versions-Historie
 
 - 1.0.1 @ 19.09.2022 10:10
-  - Übergabe-Paramater als das "notice_script" erweitert
+  - Übergabe-Paramater an das "notice_script" erweitert und dokumentiert
 
 - 1.0 @ 17.09.2022 11:57
   - Initiale Version
