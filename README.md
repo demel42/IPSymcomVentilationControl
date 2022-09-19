@@ -105,6 +105,20 @@ alle Funktionen sind über _RequestAction_ der jeweiligen Variablen ansteuerbar
 | Messwerte                         |          |              | verschiedenen Messwerte (Temperatur, Luftfeuchte), die je nach genutzer Funktion benötigt werden |
 | ... Variablen ... anlegen         | boolean  |              | man kann für die berechneten Werte Variablen anlegen lassen, man kann diese aber auch im "Exterten-Bereich" einsehen |
 
+- Benachrichtigungs-Script
+Dem Script werden Parameter übergeben, die als Bestandteil von *_IPS* enthalten sind
+
+| Name         | Typ      | Beschreibung |
+| :----------- | :------  | :----------- |
+| instanceID   | integer  | ID der aufrufenden Instanz
+| TriggerTime  | integer  | Zeitpunkt der Erkennung des Öffnungsstatus |
+| duration     | string   | Dauer ab Öffnung in lesbarer Form |
+| ClosureState | string   | Öffnungsstatus (gemäß *VentilationMonitoring.ClosureState*) |
+|              |          | |
+| targets      | string   | Komma-separierte Liste der Ziele der Temperaturabsenkung |
+|              |          | |
+| *            |          | die diversen gemessenen oder berechneten Werte (siehe *Experten-Bereich*) |
+
 #### Aktionen
 
 | Bezeichnung                | Beschreibung |
@@ -145,6 +159,9 @@ Es werden folgende Variablenprofile angelegt:
    - https://www.cactus2000.de/de/unit/masshum.shtml
 
 ## 7. Versions-Historie
+
+- 1.0.1 @ 19.09.2022 10:10
+  - Übergabe-Paramater als das "notice_script" erweitert
 
 - 1.0 @ 17.09.2022 11:57
   - Initiale Version

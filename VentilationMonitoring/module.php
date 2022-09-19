@@ -1250,9 +1250,15 @@ class VentilationMonitoring extends IPSModule
                     $notice_script = $this->ReadPropertyString('notice_script');
                     if ($notice_script != false) {
                         $msg .= ', make notification';
+
+                        $triggerTime = $this->GetValue('TriggerTime');
                         $params = [
-                            'instanceID' => $this->InstanceID,
+                            'instanceID'   => $this->InstanceID,
+                            'TriggerTime'  => $triggerTime,
+                            'duration'     => ($triggerTime ? $this->seconds2duration(time() - $triggerTime) : ''),
+                            'ClosureState' => $this->GetValueFormatted('ClosureState'),
                         ];
+
                         $lowering_targets = json_decode($this->ReadPropertyString('lowering_targets'), true);
                         if ($lowering_targets != false) {
                             $targets = [];
@@ -1264,6 +1270,9 @@ class VentilationMonitoring extends IPSModule
                             }
                             $params['targets'] = implode(',', $targets);
                         }
+
+                        $params = array_merge($params, $this->GetAllValues());
+
                         @$r = IPS_RunScriptTextWaitEx($notice_script, $params);
                         $this->SendDebug(__FUNCTION__, 'script("...", ' . print_r($params, true) . ' => ' . $r, 0);
                         $jstate['step'] = 'notified';
@@ -1370,7 +1379,6 @@ class VentilationMonitoring extends IPSModule
                 $passed = true;
                 if ($passed) {
                     $condition = $duration['condition'];
-                    $this->SendDebug(__FUNCTION__, 'condition=' . $condition, 0);
                     if (json_decode($condition, true) != false) {
                         $passed = IPS_IsConditionPassing($condition);
                         $this->SendDebug(__FUNCTION__, 'condition passed=' . $this->bool2str($passed), 0);
