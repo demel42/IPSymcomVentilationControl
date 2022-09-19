@@ -9,6 +9,8 @@
 				"Um \"Feuchtigkeit reduzieren möglich\" zu berechnen, muss das Feld \"{$field}\" konfiguriert sein",
 			"To calculate \"Risk of mold\", Field \"{$field}\" must be configured":
 				"Um \"Risiko einer Schimmelbildung\" zu berechnen, muss das Feld \"{$field}\" konfiguriert sein",
+			"Number of repetitions is configured, but neither a fixed value nor the variable":
+				"Anzahl der Wiederholungen ist konfiguriert, aber weder ein fester Wert noch die Variable",
 
 			"__properties__": "",
 			"Disable instance": "Instanz deaktivieren",
@@ -43,6 +45,7 @@
 			"Notification": "Benachrichtigung",
 			"Script to call after the specified duration has elapsed": "Script zum Aufruf nach Ablauf der angegebenen Dauer",
 			"Pause until repeated notification": "Pause bis zur wiederholten Benachrichtigung",
+			"Maximum repetitions (-1=infinite)": "maximale Wiederholungen (-1=unendlich)",
 
 			"Humidity": "Luftfeuchtigkeit",
 			"Provide information for \"Reduce humidity possible\"": "Informationen für \"Feuchtigkeit reduzieren möglich\" bereitstellen",

@@ -94,12 +94,13 @@ alle Funktionen sind über _RequestAction_ der jeweiligen Variablen ansteuerbar
 |                                   |          |              | |
 | Benachrichtigung                  |          |              | |
 | ... Script                        | string   |              | Script zum Aufruf einer Benachrichtigung |
-| ... Pause                         | integer  |              | Pause biß zur erneuten Benachrichtigung (0=nur einmal) |
+| ... Pause                         | integer  |              | Pause bis zur erneuten Benachrichtigung |
+| ... max Wiederholung              | integer  |              | Maximale Anzahl von Wiederholungen der Benachrichtigungen (-1=unendlich) |
 |                                   |          |              | |
 | Luftfeuchtigkeit                  |          |              | |
 | ... Lüften möglich                | boolean  |              | Lüften ist sinnvoll möglich, wenn die Feuchte drinnen > draussen |
 | ... Schimmelbildung               | boolean  |              | Hinweis auf die Gefahr einer Schimmelbildung |
-|     ... Gesamtwärmeübergangs...   | float    |              | Wert für den Wärmeverlust einer Aussenwand |
+|     ... Gesamtwärmeübergang...    | float    |              | Wert für den Wärmeverlust einer Aussenwand |
 |     ... min. Feuchte              | float    |              | minimale Luftfeuchte, bei der Schimmel entstehen könnte |
 |                                   |          |              | |
 | Messwerte                         |          |              | verschiedenen Messwerte (Temperatur, Luftfeuchte), die je nach genutzer Funktion benötigt werden |
@@ -160,8 +161,11 @@ Es werden folgende Variablenprofile angelegt:
 
 ## 7. Versions-Historie
 
+- 1.0.2 @ 19.09.2022 17:45
+  - Neu: max. Anzahl von Wiederholung der Benachrichgtigung
+
 - 1.0.1 @ 19.09.2022 10:10
-  - Übergabe-Paramater an das "notice_script" erweitert und dokumentiert
+  - Neu: Übergabe-Paramater an das "notice_script" erweitert und dokumentiert
 
 - 1.0 @ 17.09.2022 11:57
   - Initiale Version

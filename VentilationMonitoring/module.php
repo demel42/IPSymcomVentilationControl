@@ -56,6 +56,8 @@ class VentilationMonitoring extends IPSModule
         $this->RegisterPropertyInteger('pause_varID', 0);
         $this->RegisterPropertyInteger('pause_timeunit', self::$TIMEUNIT_MINUTES);
 
+        $this->RegisterPropertyInteger('max_repetitions', 0);
+
         $this->RegisterPropertyBoolean('with_calculations', false);
         $this->RegisterPropertyBoolean('with_reduce_humidity', false);
         $this->RegisterPropertyBoolean('with_risk_of_mold', false);
@@ -145,6 +147,15 @@ class VentilationMonitoring extends IPSModule
                 $this->SendDebug(__FUNCTION__, '"thermal_resistance" is undefined or invalid', 0);
                 $field = $this->Translate('Total thermal resistance of outer wall');
                 $r[] = $this->TranslateFormat('To calculate "Risk of mold", Field "{$field}" must be configured', ['{$field}' => $field]);
+            }
+        }
+
+        $max_repetitions = $this->ReadPropertyInteger('max_repetitions');
+        if ($max_repetitions != 0) {
+            $pause_value = $this->ReadPropertyInteger('pause_value');
+            $pause_varID = $this->ReadPropertyInteger('pause_varID');
+            if ($pause_value == 0 && IPS_VariableExists($pause_varID) == false) {
+                $r[] = $this->Translate('Number of repetitions is configured, but neither a fixed value nor the variable');
             }
         }
 
@@ -702,6 +713,12 @@ class VentilationMonitoring extends IPSModule
                         ],
                     ],
                 ],
+                [
+                    'type'    => 'NumberSpinner',
+                    'minimum' => -1,
+                    'name'    => 'max_repetitions',
+                    'caption' => 'Maximum repetitions (-1=infinite)'
+                ],
             ],
             'caption' => 'Notification',
         ];
@@ -1004,6 +1021,7 @@ class VentilationMonitoring extends IPSModule
             }
             $jstate['save'] = $save;
             $jstate['step'] = 'lowered';
+            $jstate['repetition'] = 0;
             $this->SendDebug(__FUNCTION__, 'saved=' . print_r($save, true), 0);
         } else {
             $save = isset($jstate['save']) ? $jstate['save'] : [];
@@ -1278,21 +1296,24 @@ class VentilationMonitoring extends IPSModule
                         $jstate['step'] = 'notified';
 
                         $sec = 0;
-                        $varID = $this->ReadPropertyInteger('pause_varID');
-                        if (IPS_VariableExists($varID)) {
-                            $tval = GetValueInteger($varID);
-                        } else {
-                            $tval = $this->ReadPropertyInteger('pause_value');
-                        }
-                        if ($tval > 0) {
-                            if (isset($jstate['repetition']) == false) {
-                                $jstate['repetition'] = 0;
+                        $max_repetitions = $this->ReadPropertyInteger('max_repetitions');
+                        if ($max_repetitions != 0) {
+                            $varID = $this->ReadPropertyInteger('pause_varID');
+                            if (IPS_VariableExists($varID)) {
+                                $tval = GetValueInteger($varID);
                             } else {
-                                $jstate['repetition']++;
-                                $unit = $this->ReadPropertyInteger('pause_timeunit');
-                                $sec = $this->CalcByTimeunit($unit, $tval);
-                                $tvS = $tval . $this->Timeunit2Suffix($unit);
-                                $msg .= ', repeat notification after ' . $tvS;
+                                $tval = $this->ReadPropertyInteger('pause_value');
+                            }
+                            if ($tval > 0) {
+                                $repetition = isset($jstate['repetition']) ? $jstate['repetition'] : 0;
+                                $repetition++;
+                                if ($max_repetitions == -1 || $repetition <= $max_repetitions) {
+                                    $jstate['repetition'] = $repetition;
+                                    $unit = $this->ReadPropertyInteger('pause_timeunit');
+                                    $sec = $this->CalcByTimeunit($unit, $tval);
+                                    $tvS = $tval . $this->Timeunit2Suffix($unit);
+                                    $msg .= ', repeat notification after ' . $tvS;
+                                }
                             }
                         }
 
