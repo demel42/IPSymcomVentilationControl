@@ -161,6 +161,9 @@ Es werden folgende Variablenprofile angelegt:
 
 ## 7. Versions-Historie
 
+- 1.0.3 @ 27.09.2022 11:56
+  - Neu: Einstellung zum Verhalten, falls die eingestellte Temperatur in der Absenkphase geändert wird
+
 - 1.0.2 @ 19.09.2022 17:45
   - Neu: max. Anzahl von Wiederholung der Benachrichgtigung
 

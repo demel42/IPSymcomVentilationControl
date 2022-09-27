@@ -26,6 +26,10 @@ class VentilationMonitoring extends IPSModule
     public static $LOWERING_MODE_TRIGGER = 1;
     public static $LOWERING_MODE_SCRIPT = 2;
 
+    public static $TEMP_CHANGE_KEEP = 0;
+    public static $TEMP_CHANGE_STOP = 1;
+    public static $TEMP_CHANGE_IGNORE = 2;
+
     public function Create()
     {
         parent::Create();
@@ -47,6 +51,7 @@ class VentilationMonitoring extends IPSModule
         $this->RegisterPropertyInteger('lowering_trigger', 1);
         $this->RegisterPropertyInteger('lowering_scriptID', 0);
         $this->RegisterPropertyString('lowering_targets', json_encode([]));
+        $this->RegisterPropertyInteger('lowering_temp_change', self::$TEMP_CHANGE_KEEP);
 
         $this->RegisterPropertyString('durations', json_encode([]));
 
@@ -471,6 +476,27 @@ class VentilationMonitoring extends IPSModule
                     'caption' => 'Lowering temperatur',
                 ],
                 [
+                    'name'    => 'lowering_temp_change',
+                    'type'    => 'Select',
+                    'options' => [
+                        [
+                            'caption' => $this->Translate('Keep lowering, use set temperature afterwards'),
+                            'value'   => self::$TEMP_CHANGE_KEEP,
+                        ],
+                        [
+                            'caption' => $this->Translate('Stop lowering the temperature'),
+                            'value'   => self::$TEMP_CHANGE_STOP,
+                        ],
+                        [
+                            'caption' => $this->Translate('Do nothing'),
+                            'value'   => self::$TEMP_CHANGE_IGNORE,
+                        ],
+                    ],
+                    'width'   => '600px',
+                    'visible' => $this->LoweringFieldsIsVisible($lowering_mode, 'lowering_temp_change'),
+                    'caption' => 'Behavior if the set temperature is changed during the lowering phase',
+                ],
+                [
                     'name'    => 'lowering_trigger',
                     'type'    => 'NumberSpinner',
                     'visible' => $this->LoweringFieldsIsVisible($lowering_mode, 'lowering_trigger'),
@@ -745,53 +771,9 @@ class VentilationMonitoring extends IPSModule
             'onClick' => 'IPS_RequestAction(' . $this->InstanceID . ', "CheckConditions", "");',
         ];
 
-        $values = $this->GetAllValues();
-        $varnames = [
-            'OutsideTemperature'      => ['Outside temperature', ' °C'],
-            'OutsideHumidity'         => ['Outside humidity', ' %'],
-            'OutsideAbsoluteHumidity' => ['Outside absolute humidity', ' g/m³'],
-            'OutsideSpecificHumidity' => ['Outside specific humidity', ' g/kg'],
-            'OutsideDewpoint'         => ['Outside dewpoint', ' °C'],
-            'IndoorTemperature'       => ['Indoor temperature', ' °C'],
-            'IndoorHumidity'          => ['Indoor humidity', ' %'],
-            'IndoorAbsoluteHumidity'  => ['Indoor absolute humidity', ' g/m³'],
-            'IndoorSpecificHumidity'  => ['Indoor specific humidity', ' g/kg'],
-            'IndoorDewpoint'          => ['Indoor temperature', ' °C'],
-            'WallTemperature'         => ['Wall temperature on the inner side', ' °C'],
-            'AirPressure'             => ['Air pressure', ' mbar'],
-        ];
+        $expert_items = [];
 
-        $vars_rows = [];
-        foreach ($varnames as $varname => $opts) {
-            if (isset($values[$varname]) == false) {
-                continue;
-            }
-            $vars_rows[] = [
-                'varname'  => $this->Translate($opts[0]),
-                'varvalue' => $values[$varname] . $opts[1],
-            ];
-        }
-
-        $vars_item = [
-            'type'     => 'List',
-            'columns'  => [
-                [
-                    'name'     => 'varname',
-                    'width'    => '400px',
-                    'caption'  => 'Name',
-                ],
-                [
-                    'name'     => 'varvalue',
-                    'width'    => 'auto',
-                    'caption'  => 'Value',
-                ],
-            ],
-            'add'      => false,
-            'delete'   => false,
-            'rowCount' => count($vars_rows),
-            'values'   => $vars_rows,
-            'caption'  => 'internal informations',
-        ];
+        $expert_items[] = $this->GetInstallVarProfilesFormItem();
 
         $outside_temp = 0;
         $indoor_temp = 0;
@@ -843,15 +825,116 @@ class VentilationMonitoring extends IPSModule
                 ],
             ],
         ];
+
+        $values = $this->GetAllValues();
+        $varnames = [
+            'OutsideTemperature'      => ['Outside temperature', ' °C'],
+            'OutsideHumidity'         => ['Outside humidity', ' %'],
+            'OutsideAbsoluteHumidity' => ['Outside absolute humidity', ' g/m³'],
+            'OutsideSpecificHumidity' => ['Outside specific humidity', ' g/kg'],
+            'OutsideDewpoint'         => ['Outside dewpoint', ' °C'],
+            'IndoorTemperature'       => ['Indoor temperature', ' °C'],
+            'IndoorHumidity'          => ['Indoor humidity', ' %'],
+            'IndoorAbsoluteHumidity'  => ['Indoor absolute humidity', ' g/m³'],
+            'IndoorSpecificHumidity'  => ['Indoor specific humidity', ' g/kg'],
+            'IndoorDewpoint'          => ['Indoor temperature', ' °C'],
+            'WallTemperature'         => ['Wall temperature on the inner side', ' °C'],
+            'AirPressure'             => ['Air pressure', ' mbar'],
+        ];
+
+        $vars_rows = [];
+        foreach ($varnames as $varname => $opts) {
+            if (isset($values[$varname]) == false) {
+                continue;
+            }
+            $vars_rows[] = [
+                'varname'  => $this->Translate($opts[0]),
+                'varvalue' => $values[$varname] . $opts[1],
+            ];
+        }
+
+        $expert_items[] = [
+            'type'     => 'List',
+            'columns'  => [
+                [
+                    'name'     => 'varname',
+                    'width'    => '400px',
+                    'caption'  => 'Name',
+                ],
+                [
+                    'name'     => 'varvalue',
+                    'width'    => 'auto',
+                    'caption'  => 'Value',
+                ],
+            ],
+            'add'      => false,
+            'delete'   => false,
+            'rowCount' => count($vars_rows),
+            'values'   => $vars_rows,
+            'caption'  => 'internal informations',
+        ];
+
+        $temp_rows = [];
+
+        $lowering_targets = json_decode($this->ReadPropertyString('lowering_targets'), true);
+        $jstate = json_decode($this->ReadAttributeString('state'), true);
+        $this->SendDebug(__FUNCTION__, 'state=' . print_r($jstate, true), 0);
+        if ($lowering_targets != false) {
+            foreach ($lowering_targets as $target) {
+                $varID = $target['varID'];
+                if (IPS_VariableExists($varID) == false) {
+                    continue;
+                }
+                $name = IPS_GetLocation($varID);
+                $current = GetValue($varID);
+                if (is_numeric($current)) {
+                    $current .= ' °C';
+                }
+                $saved = isset($jstate['save'][$varID]) ? $jstate['save'][$varID] : '';
+                if (is_numeric($saved)) {
+                    $saved .= ' °C';
+                }
+                $temp_rows[] = [
+                    'name'     => $name,
+                    'current'  => $current,
+                    'saved'    => $saved,
+                ];
+            }
+        }
+
+        if ($temp_rows != []) {
+            $expert_items[] = [
+                'type'     => 'List',
+                'columns'  => [
+                    [
+                        'name'     => 'name',
+                        'width'    => 'auto',
+                        'caption'  => 'Name',
+                    ],
+                    [
+                        'name'     => 'current',
+                        'width'    => '200px',
+                        'caption'  => 'current',
+                    ],
+                    [
+                        'name'     => 'saved',
+                        'width'    => '200px',
+                        'caption'  => 'saved',
+                    ],
+                ],
+                'add'      => false,
+                'delete'   => false,
+                'rowCount' => count($temp_rows),
+                'values'   => $temp_rows,
+                'caption'  => 'temperature values',
+            ];
+        }
+
         $formActions[] = [
             'type'      => 'ExpansionPanel',
             'caption'   => 'Expert area',
             'expanded ' => false,
-            'items'     => [
-                $calc_item,
-                $this->GetInstallVarProfilesFormItem(),
-                $vars_item,
-            ],
+            'items'     => $expert_items,
         ];
 
         $formActions[] = [
@@ -878,6 +961,7 @@ class VentilationMonitoring extends IPSModule
             case self::$LOWERING_MODE_TEMP:
                 $visible_flds = [
                     'lowering_temperature',
+                    'lowering_temp_change',
                 ];
                 break;
             case self::$LOWERING_MODE_TRIGGER:
@@ -907,6 +991,7 @@ class VentilationMonitoring extends IPSModule
             case 'UpdateFormField4Lowering':
                 $fields = [
                     'lowering_temperature',
+                    'lowering_temp_change',
                     'lowering_trigger',
                     'lowering_scriptID',
                 ];
@@ -956,10 +1041,28 @@ class VentilationMonitoring extends IPSModule
         }
     }
 
-    private function AdjustTemperature($lower, &$jstate)
+    private function MonitorTemperature($enable)
     {
         $lowering_mode = $this->ReadPropertyInteger('lowering_mode');
+        if ($lowering_mode == self::$LOWERING_MODE_TEMP) {
+            $lowering_targets = json_decode($this->ReadPropertyString('lowering_targets'), true);
+            if ($lowering_targets != false) {
+                foreach ($lowering_targets as $target) {
+                    $varID = $target['varID'];
+                    if (IPS_VariableExists($varID)) {
+                        if ($enable) {
+                            $this->RegisterMessage($varID, VM_UPDATE);
+                        } else {
+                            $this->UnregisterMessage($varID, VM_UPDATE);
+                        }
+                    }
+                }
+            }
+        }
+    }
 
+    private function AdjustTemperature($lower, &$jstate)
+    {
         if ($lower) {
             $save = [];
             $lowering_targets = json_decode($this->ReadPropertyString('lowering_targets'), true);
@@ -970,6 +1073,7 @@ class VentilationMonitoring extends IPSModule
                         $save[$varID] = GetValue($varID);
                     }
                 }
+                $lowering_mode = $this->ReadPropertyInteger('lowering_mode');
                 switch ($lowering_mode) {
                     case self::$LOWERING_MODE_TEMP:
                         $varID = $this->ReadPropertyInteger('lowering_temp_varID');
@@ -981,8 +1085,10 @@ class VentilationMonitoring extends IPSModule
                         foreach ($lowering_targets as $target) {
                             $varID = $target['varID'];
                             if (IPS_VariableExists($varID)) {
-                                RequestAction($varID, $val);
-                                $this->SendDebug(__FUNCTION__, 'RequestAction(' . $varID . ' ' . IPS_GetLocation($varID) . ', ' . $val . ')', 0);
+                                if (GetValueFloat($varID) != $val) {
+                                    RequestAction($varID, $val);
+                                    $this->SendDebug(__FUNCTION__, 'RequestAction(' . $varID . ' ' . IPS_GetLocation($varID) . ', ' . $val . ')', 0);
+                                }
                             }
                         }
                         break;
@@ -1025,12 +1131,15 @@ class VentilationMonitoring extends IPSModule
             $this->SendDebug(__FUNCTION__, 'saved=' . print_r($save, true), 0);
         } else {
             $save = isset($jstate['save']) ? $jstate['save'] : [];
+            $lowering_mode = $this->ReadPropertyInteger('lowering_mode');
             switch ($lowering_mode) {
                 case self::$LOWERING_MODE_TEMP:
                     foreach ($save as $varID => $val) {
                         if (IPS_VariableExists($varID)) {
-                            RequestAction($varID, $val);
-                            $this->SendDebug(__FUNCTION__, 'RequestAction(' . $varID . ' ' . IPS_GetLocation($varID) . ', ' . $val . ')', 0);
+                            if (GetValueFloat($varID) != $val) {
+                                RequestAction($varID, $val);
+                                $this->SendDebug(__FUNCTION__, 'RequestAction(' . $varID . ' ' . IPS_GetLocation($varID) . ', ' . $val . ')', 0);
+                            }
                         }
                     }
                     break;
@@ -1161,10 +1270,12 @@ class VentilationMonitoring extends IPSModule
                         $this->SendDebug(__FUNCTION__, 'new state=' . print_r($jstate, true), 0);
                         $this->WriteAttributeString('state', json_encode($jstate));
                         $this->MaintainTimer('LoopTimer', $duration * 1000);
+                        $this->MonitorTemperature(true);
                     }
                 } else {
                     if (isset($jstate['step']) == false || $jstate['step'] != 'inactive') {
                         $msg = $conditionS . ' => stop timer';
+                        $this->MonitorTemperature(false);
                         $this->AdjustTemperature(false, $jstate);
                         $this->SendDebug(__FUNCTION__, 'new state=' . print_r($jstate, true), 0);
                         $this->WriteAttributeString('state', json_encode($jstate));
@@ -1176,12 +1287,72 @@ class VentilationMonitoring extends IPSModule
 
                 $this->SendDebug(__FUNCTION__, $msg, 0);
                 $this->AddModuleActivity($msg);
+            } elseif ($closureState != self::$CLOSURE_STATE_CLOSE) {
+                $lowering_mode = $this->ReadPropertyInteger('lowering_mode');
+                if ($lowering_mode == self::$LOWERING_MODE_TEMP) {
+                    $lowering_targets = json_decode($this->ReadPropertyString('lowering_targets'), true);
+                    if ($lowering_targets != false) {
+                        $varID = $this->ReadPropertyInteger('lowering_temp_varID');
+                        if (IPS_VariableExists($varID)) {
+                            $val = GetValueFloat($varID);
+                        } else {
+                            $val = $this->ReadPropertyFloat('lowering_temp_value');
+                        }
+                        $changed_varIDs = [];
+                        foreach ($lowering_targets as $target) {
+                            $varID = $target['varID'];
+                            if (IPS_VariableExists($varID)) {
+                                if (GetValue($varID) != $val) {
+                                    $changed_varIDs[] = $varID;
+                                }
+                            }
+                        }
+                        if ($changed_varIDs != []) {
+                            $lowering_temp_change = $this->ReadPropertyInteger('lowering_temp_change');
+                            switch ($lowering_temp_change) {
+                                case self::$TEMP_CHANGE_KEEP:
+                                    $this->MonitorTemperature(false);
+                                    foreach ($changed_varIDs as $varID) {
+                                        if (GetValueFloat($varID) != $val) {
+                                            $jstate['save'][$varID] = GetValue($varID);
+                                            RequestAction($varID, $val);
+                                            $this->SendDebug(__FUNCTION__, 'RequestAction(' . $varID . ' ' . IPS_GetLocation($varID) . ', ' . $val . ')', 0);
+                                        }
+                                    }
+                                    $this->SendDebug(__FUNCTION__, 'new state=' . print_r($jstate, true), 0);
+                                    $this->WriteAttributeString('state', json_encode($jstate));
+                                    $msg = 'changed set temperature of variable(s) ' . implode(',', $changed_varIDs) . ' => adjust saved values';
+                                    $this->AddModuleActivity($msg);
+                                    $this->MonitorTemperature(true);
+                                    break;
+                                case self::$TEMP_CHANGE_STOP:
+                                    foreach ($changed_varIDs as $varID) {
+                                        if (GetValueFloat($varID) != $val) {
+                                            $jstate['save'][$varID] = GetValue($varID);
+                                        }
+                                    }
+                        $this->MonitorTemperature(false);
+                                    $this->AdjustTemperature(false, $jstate);
+                                    $this->SendDebug(__FUNCTION__, 'new state=' . print_r($jstate, true), 0);
+                                    $this->WriteAttributeString('state', json_encode($jstate));
+                                    $this->MaintainTimer('LoopTimer', 0);
+                                    $msg = 'changed set temperature of variable(s) ' . implode(',', $changed_varIDs) . ' => stop timer';
+                                    $this->AddModuleActivity($msg);
+                                    break;
+                                case self::$TEMP_CHANGE_IGNORE:
+                                    $this->SendDebug(__FUNCTION__, 'ignore change of set temperature', 0);
+                                    break;
+                            }
+                        }
+                    }
+                }
             }
         } else {
             $this->SetValue('ClosureState', $closureState);
             if ($oldTriggerTime) {
-                $this->SetValue('TriggerTime', 0);
                 $msg = $conditionS . ' => stop timer';
+                $this->SetValue('TriggerTime', 0);
+                $this->MonitorTemperature(false);
                 $this->AdjustTemperature(false, $jstate);
                 $this->SendDebug(__FUNCTION__, 'new state=' . print_r($jstate, true), 0);
                 $this->WriteAttributeString('state', json_encode($jstate));
@@ -1262,6 +1433,7 @@ class VentilationMonitoring extends IPSModule
                 $this->SendDebug(__FUNCTION__, 'new state=' . print_r($jstate, true), 0);
                 $this->WriteAttributeString('state', json_encode($jstate));
                 $this->MaintainTimer('LoopTimer', $duration * 1000);
+                $this->MonitorTemperature(true);
             } else {
                 $duration = $this->CalcDuration();
                 if ($duration > 0) {
@@ -1329,6 +1501,7 @@ class VentilationMonitoring extends IPSModule
         } else {
             if (isset($jstate['step']) == false || $jstate['step'] != 'inactive') {
                 $msg .= ' => stop timer';
+                $this->MonitorTemperature(false);
                 $this->AdjustTemperature(false, $jstate);
                 $this->SendDebug(__FUNCTION__, 'new state=' . print_r($jstate, true), 0);
                 $this->WriteAttributeString('state', json_encode($jstate));

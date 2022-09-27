@@ -29,12 +29,20 @@
 			"Lowering mode": "Absenkungsmodus",
 			"Set temperatur": "Temperatur einstellen",
 			"Set trigger": "Auslöser setzen",
+
 			"Call script": "Skript aufrufen",
 			"Lowering temperatur": "Absenktemperatur",
 			"Trigger value": "Wert für Auslöser",
 			"Script to lower temperatur": "Skript zur Temperaturabsenkung",
 			"Target variables": "Zielvariablen",
 			"Variable": "Variable",
+
+			"Behavior if the set temperature is changed during the lowering phase":
+				"Verhalten, falls die eingestellte Temperatur in der Absenkphase geändert wird",
+			"Keep lowering, use set temperature afterwards":
+				"Absenkung beibehalten, anschliessend eingestellte Temperatur verwenden",
+			"Stop lowering the temperature": "Absenkung der Temperatur beenden",
+			"Do nothing": "nichts tun",
 
 			"Upper temperature limit": "Temperatur Obergrenze",
 			"Complex condition": "Komplexe Bedingungen",
@@ -68,6 +76,9 @@
 			"Check conditions": "Bedingungen prüfen",
 
 			"internal informations": "interne Informationen",
+			"temperature values": "Temperatur-Werte",
+			"current": "aktuell",
+			"saved": "gesichert",
 
 			"Calculate thermal resistance": "Wärmewiderstand berechnen",
 			"Outside temperature": "Außentemperatur",
