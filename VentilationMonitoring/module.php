@@ -1331,7 +1331,7 @@ class VentilationMonitoring extends IPSModule
                                             $jstate['save'][$varID] = GetValue($varID);
                                         }
                                     }
-                        $this->MonitorTemperature(false);
+                                    $this->MonitorTemperature(false);
                                     $this->AdjustTemperature(false, $jstate);
                                     $this->SendDebug(__FUNCTION__, 'new state=' . print_r($jstate, true), 0);
                                     $this->WriteAttributeString('state', json_encode($jstate));
