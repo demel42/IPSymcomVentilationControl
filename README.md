@@ -162,8 +162,8 @@ Es werden folgende Variablenprofile angelegt:
 ## 7. Versions-Historie
 
 - 1.0.4 @ 07.10.2022 13:31
-  - Fix: Update-Prüfung wieder funktionsfähig
   - update submodule CommonStubs
+    Fix: Update-Prüfung wieder funktionsfähig
 
 - 1.0.3 @ 27.09.2022 11:56
   - Neu: Einstellung zum Verhalten, falls die eingestellte Temperatur in der Absenkphase geändert wird
