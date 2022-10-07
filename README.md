@@ -162,7 +162,7 @@ Es werden folgende Variablenprofile angelegt:
 ## 7. Versions-Historie
 
 - 1.0.4 @ 07.10.2022 13:31
-  - Fix: Update-Prüfung wieder funktionsfähih
+  - Fix: Update-Prüfung wieder funktionsfähig
   - update submodule CommonStubs
 
 - 1.0.3 @ 27.09.2022 11:56
