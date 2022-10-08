@@ -161,6 +161,9 @@ Es werden folgende Variablenprofile angelegt:
 
 ## 7. Versions-Historie
 
+- 1.1 @ 08.10.2022 14:48
+  - Neu: Absicherung des Zugriffs via Semaphore
+
 - 1.0.4 @ 07.10.2022 13:31
   - update submodule CommonStubs
     Fix: Update-Prüfung wieder funktionsfähig

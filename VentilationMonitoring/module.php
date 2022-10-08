@@ -10,16 +10,6 @@ class VentilationMonitoring extends IPSModule
     use VentilationMonitoring\StubsCommonLib;
     use VentilationMonitoringLocalLib;
 
-    private $ModuleDir;
-
-    public function __construct(string $InstanceID)
-    {
-        parent::__construct($InstanceID);
-
-        $this->ModuleDir = __DIR__;
-    }
-
-    private static $semaphoreID = __CLASS__;
     private static $semaphoreTM = 5 * 1000;
 
     public static $LOWERING_MODE_TEMP = 0;
@@ -29,6 +19,17 @@ class VentilationMonitoring extends IPSModule
     public static $TEMP_CHANGE_KEEP = 0;
     public static $TEMP_CHANGE_STOP = 1;
     public static $TEMP_CHANGE_IGNORE = 2;
+
+    private $ModuleDir;
+    private $SemaphoreID;
+
+    public function __construct(string $InstanceID)
+    {
+        parent::__construct($InstanceID);
+
+        $this->ModuleDir = __DIR__;
+        $this->SemaphoreID = __CLASS__ . '_' . $InstanceID;
+    }
 
     public function Create()
     {
@@ -1187,8 +1188,9 @@ class VentilationMonitoring extends IPSModule
         }
 
         $this->CalcDuration();
-        if (IPS_SemaphoreEnter(self::$semaphoreID, self::$semaphoreTM) == false) {
-            $this->SendDebug(__FUNCTION__, 'sempahore ' . self::$semaphoreID . ' is not accessable', 0);
+
+        if (IPS_SemaphoreEnter($this->SemaphoreID, self::$semaphoreTM) == false) {
+            $this->SendDebug(__FUNCTION__, 'unable to lock sempahore ' . $this->SemaphoreID, 0);
             return;
         }
 
@@ -1360,7 +1362,7 @@ class VentilationMonitoring extends IPSModule
             }
         }
 
-        IPS_SemaphoreLeave(self::$semaphoreID);
+        IPS_SemaphoreLeave($this->SemaphoreID);
 
         $values = $this->GetAllValues();
 
@@ -1411,8 +1413,8 @@ class VentilationMonitoring extends IPSModule
 
     private function CheckTimer()
     {
-        if (IPS_SemaphoreEnter(self::$semaphoreID, self::$semaphoreTM) == false) {
-            $this->SendDebug(__FUNCTION__, 'sempahore ' . self::$semaphoreID . ' is not accessable', 0);
+        if (IPS_SemaphoreEnter($this->SemaphoreID, self::$semaphoreTM) == false) {
+            $this->SendDebug(__FUNCTION__, 'unable to lock sempahore ' . $this->SemaphoreID, 0);
             return;
         }
 
@@ -1514,7 +1516,7 @@ class VentilationMonitoring extends IPSModule
         $this->SendDebug(__FUNCTION__, $msg, 0);
         $this->AddModuleActivity($msg);
 
-        IPS_SemaphoreLeave(self::$semaphoreID);
+        IPS_SemaphoreLeave($this->SemaphoreID);
     }
 
     private function CalcThermalResistance($params)
