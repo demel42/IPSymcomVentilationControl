@@ -48,6 +48,7 @@ trait VentilationMonitoringLocalLib
             ['Wert' => true, 'Name' => $this->Translate('Yes'), 'Farbe' => -1],
         ];
         $this->CreateVarProfile('VentilationMonitoring.ReduceHumidityPossible', VARIABLETYPE_BOOLEAN, '', 0, 0, 0, 0, '', $associations, $reInstall);
+        $this->CreateVarProfile('VentilationMonitoring.YesNo', VARIABLETYPE_BOOLEAN, '', 0, 0, 0, 0, '', $associations, $reInstall);
 
         $associations = [
             ['Wert' => self::$CLOSURE_STATE_CLOSE, 'Name' => $this->Translate('Close'), 'Farbe' => -1],

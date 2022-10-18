@@ -64,6 +64,8 @@ class VentilationMonitoring extends IPSModule
 
         $this->RegisterPropertyInteger('max_repetitions', 0);
 
+        $this->RegisterPropertyBoolean('notification_control', false);
+
         $this->RegisterPropertyBoolean('with_calculations', false);
         $this->RegisterPropertyBoolean('with_reduce_humidity', false);
         $this->RegisterPropertyBoolean('with_risk_of_mold', false);
@@ -84,7 +86,7 @@ class VentilationMonitoring extends IPSModule
 
         $this->InstallVarProfiles(false);
 
-        $this->RegisterTimer('LoopTimer', 0, 'IPS_RequestAction(' . $this->InstanceID . ', "CheckTimer", "");');
+        $this->RegisterTimer('CheckTimer', 0, 'IPS_RequestAction(' . $this->InstanceID . ', "CheckTimer", "");');
 
         $this->RegisterMessage(0, IPS_KERNELMESSAGE);
     }
@@ -94,12 +96,12 @@ class VentilationMonitoring extends IPSModule
         parent::MessageSink($timestamp, $senderID, $message, $data);
 
         if ($message == IPS_KERNELMESSAGE && $data[0] == KR_READY) {
-            $this->CheckConditions();
+            IPS_RequestAction($this->InstanceID, 'CheckConditions', '');
         }
 
         if (IPS_GetKernelRunlevel() == KR_READY && $message == VM_UPDATE && $data[1] == true /* changed */) {
             $this->SendDebug(__FUNCTION__, 'timestamp=' . $timestamp . ', senderID=' . $senderID . ', message=' . $message . ', data=' . print_r($data, true), 0);
-            $this->CheckConditions();
+            IPS_RequestAction($this->InstanceID, 'CheckConditions', '');
         }
     }
 
@@ -306,6 +308,12 @@ class VentilationMonitoring extends IPSModule
             $this->MaintainAction('MonitorVentilation', true);
         }
 
+        $notification_control = $this->ReadPropertyBoolean('notification_control');
+        $this->MaintainVariable('SuspendNotification', $this->Translate('Suspend notification'), VARIABLETYPE_BOOLEAN, 'VentilationMonitoring.YesNo', $vpos++, $notification_control);
+        if ($notification_control) {
+            $this->MaintainAction('SuspendNotification', true);
+        }
+
         $with_calculations = $this->ReadPropertyBoolean('with_calculations');
         $with_reduce_humidity = $this->ReadPropertyBoolean('with_reduce_humidity');
         $with_risk_of_mold = $this->ReadPropertyBoolean('with_risk_of_mold');
@@ -340,6 +348,7 @@ class VentilationMonitoring extends IPSModule
 
         if (IPS_GetKernelRunlevel() == KR_READY) {
             $this->CheckConditions();
+            // IPS_RequestAction($this->InstanceID, "CheckConditions", "");
         }
     }
 
@@ -746,6 +755,11 @@ class VentilationMonitoring extends IPSModule
                     'name'    => 'max_repetitions',
                     'caption' => 'Maximum repetitions (-1=infinite)'
                 ],
+                [
+                    'type'    => 'CheckBox',
+                    'name'    => 'notification_control',
+                    'caption' => 'Variable to suspend notifications',
+                ],
             ],
             'caption' => 'Notification',
         ];
@@ -1033,6 +1047,9 @@ class VentilationMonitoring extends IPSModule
                 $this->SetValue($ident, $value);
                 $this->CheckConditions();
                 break;
+            case 'SuspendNotification':
+                $r = true;
+                break;
             default:
                 $this->SendDebug(__FUNCTION__, 'invalid ident ' . $ident, 0);
                 break;
@@ -1260,7 +1277,7 @@ class VentilationMonitoring extends IPSModule
                         $jstate['step'] = 'delay';
                         $this->SendDebug(__FUNCTION__, 'new state=' . print_r($jstate, true), 0);
                         $this->WriteAttributeString('state', json_encode($jstate));
-                        $this->MaintainTimer('LoopTimer', $sec * 1000);
+                        $this->MaintainTimer('CheckTimer', $sec * 1000);
                     } else {
                         $duration = $this->CalcDuration();
                         if ($duration > 0) {
@@ -1271,7 +1288,7 @@ class VentilationMonitoring extends IPSModule
                         $this->AdjustTemperature(true, $jstate);
                         $this->SendDebug(__FUNCTION__, 'new state=' . print_r($jstate, true), 0);
                         $this->WriteAttributeString('state', json_encode($jstate));
-                        $this->MaintainTimer('LoopTimer', $duration * 1000);
+                        $this->MaintainTimer('CheckTimer', $duration * 1000);
                         $this->MonitorTemperature(true);
                     }
                 } else {
@@ -1284,7 +1301,7 @@ class VentilationMonitoring extends IPSModule
                     } else {
                         $msg = $conditionS . ' => no timer';
                     }
-                    $this->MaintainTimer('LoopTimer', 0);
+                    $this->MaintainTimer('CheckTimer', 0);
                 }
 
                 $this->SendDebug(__FUNCTION__, $msg, 0);
@@ -1337,7 +1354,7 @@ class VentilationMonitoring extends IPSModule
                                     $this->AdjustTemperature(false, $jstate);
                                     $this->SendDebug(__FUNCTION__, 'new state=' . print_r($jstate, true), 0);
                                     $this->WriteAttributeString('state', json_encode($jstate));
-                                    $this->MaintainTimer('LoopTimer', 0);
+                                    $this->MaintainTimer('CheckTimer', 0);
                                     $msg = 'changed set temperature of variable(s) ' . implode(',', $changed_varIDs) . ' => stop timer';
                                     $this->AddModuleActivity($msg);
                                     break;
@@ -1358,7 +1375,7 @@ class VentilationMonitoring extends IPSModule
                 $this->AdjustTemperature(false, $jstate);
                 $this->SendDebug(__FUNCTION__, 'new state=' . print_r($jstate, true), 0);
                 $this->WriteAttributeString('state', json_encode($jstate));
-                $this->MaintainTimer('LoopTimer', 0);
+                $this->MaintainTimer('CheckTimer', 0);
             }
         }
 
@@ -1434,40 +1451,46 @@ class VentilationMonitoring extends IPSModule
                 $this->AdjustTemperature(true, $jstate);
                 $this->SendDebug(__FUNCTION__, 'new state=' . print_r($jstate, true), 0);
                 $this->WriteAttributeString('state', json_encode($jstate));
-                $this->MaintainTimer('LoopTimer', $duration * 1000);
+                $this->MaintainTimer('CheckTimer', $duration * 1000);
                 $this->MonitorTemperature(true);
             } else {
                 $duration = $this->CalcDuration();
                 if ($duration > 0) {
                     $notice_script = $this->ReadPropertyString('notice_script');
                     if ($notice_script != false) {
-                        $msg .= ', make notification';
+                        $notification_control = $this->ReadPropertyBoolean('notification_control');
+                        $notificationSuspended = $notification_control ? $this->GetValue('SuspendNotification') : false;
+                        if ($notificationSuspended) {
+                            $msg .= ', notification suspended';
+                        } else {
+                            $msg .= ', make notification';
 
-                        $triggerTime = $this->GetValue('TriggerTime');
-                        $params = [
-                            'instanceID'   => $this->InstanceID,
-                            'TriggerTime'  => $triggerTime,
-                            'duration'     => ($triggerTime ? $this->seconds2duration(time() - $triggerTime) : ''),
-                            'ClosureState' => $this->GetValueFormatted('ClosureState'),
-                        ];
+                            $triggerTime = $this->GetValue('TriggerTime');
+                            $params = [
+                                'instanceID'   => $this->InstanceID,
+                                'TriggerTime'  => $triggerTime,
+                                'duration'     => ($triggerTime ? $this->seconds2duration(time() - $triggerTime) : ''),
+                                'ClosureState' => $this->GetValueFormatted('ClosureState'),
+                            ];
 
-                        $lowering_targets = json_decode($this->ReadPropertyString('lowering_targets'), true);
-                        if ($lowering_targets != false) {
-                            $targets = [];
-                            foreach ($lowering_targets as $target) {
-                                $varID = $target['varID'];
-                                if (IPS_VariableExists($varID)) {
-                                    $targets[] = $varID;
+                            $lowering_targets = json_decode($this->ReadPropertyString('lowering_targets'), true);
+                            if ($lowering_targets != false) {
+                                $targets = [];
+                                foreach ($lowering_targets as $target) {
+                                    $varID = $target['varID'];
+                                    if (IPS_VariableExists($varID)) {
+                                        $targets[] = $varID;
+                                    }
                                 }
+                                $params['targets'] = implode(',', $targets);
                             }
-                            $params['targets'] = implode(',', $targets);
+
+                            $params = array_merge($params, $this->GetAllValues());
+
+                            @$r = IPS_RunScriptTextWaitEx($notice_script, $params);
+                            $this->SendDebug(__FUNCTION__, 'script("...", ' . print_r($params, true) . ' => ' . $r, 0);
+                            $jstate['step'] = 'notified';
                         }
-
-                        $params = array_merge($params, $this->GetAllValues());
-
-                        @$r = IPS_RunScriptTextWaitEx($notice_script, $params);
-                        $this->SendDebug(__FUNCTION__, 'script("...", ' . print_r($params, true) . ' => ' . $r, 0);
-                        $jstate['step'] = 'notified';
 
                         $sec = 0;
                         $max_repetitions = $this->ReadPropertyInteger('max_repetitions');
@@ -1493,10 +1516,10 @@ class VentilationMonitoring extends IPSModule
 
                         $this->SendDebug(__FUNCTION__, 'new state=' . print_r($jstate, true), 0);
                         $this->WriteAttributeString('state', json_encode($jstate));
-                        $this->MaintainTimer('LoopTimer', $sec * 1000);
+                        $this->MaintainTimer('CheckTimer', $sec * 1000);
                     } else {
                         $this->SendDebug(__FUNCTION__, 'no notice-script', 0);
-                        $this->MaintainTimer('LoopTimer', 0);
+                        $this->MaintainTimer('CheckTimer', 0);
                     }
                 }
             }
@@ -1510,13 +1533,13 @@ class VentilationMonitoring extends IPSModule
             } else {
                 $msg .= ' => clear timer';
             }
-            $this->MaintainTimer('LoopTimer', 0);
+            $this->MaintainTimer('CheckTimer', 0);
         }
+
+        IPS_SemaphoreLeave($this->SemaphoreID);
 
         $this->SendDebug(__FUNCTION__, $msg, 0);
         $this->AddModuleActivity($msg);
-
-        IPS_SemaphoreLeave($this->SemaphoreID);
     }
 
     private function CalcThermalResistance($params)

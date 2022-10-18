@@ -132,7 +132,8 @@ Dem Script werden Parameter übergeben, die als Bestandteil von *_IPS* enthalten
 
 Es werden folgende Variablenprofile angelegt:
 * Boolean<br>
-  VentilationMonitoring.ReduceHumidityPossible
+  VentilationMonitoring.ReduceHumidityPossible,
+  VentilationMonitoring.YesNo
 
 * Integer<br>
   VentilationMonitoring.ClosureState,
@@ -160,6 +161,10 @@ Es werden folgende Variablenprofile angelegt:
    - https://www.cactus2000.de/de/unit/masshum.shtml
 
 ## 7. Versions-Historie
+
+- 1.2 @ 18.10.2022 11:37
+  - Neu: optionale Variable zur temporären Unterdrückung von Benachrichtigungen
+  - Fix: Verbesserung n MessageSink() um VM_UPDATE-Meldungen zu vermeiden 
 
 - 1.1 @ 08.10.2022 14:48
   - Neu: Absicherung des Zugriffs via Semaphore

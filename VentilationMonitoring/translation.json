@@ -54,6 +54,7 @@
 			"Script to call after the specified duration has elapsed": "Script zum Aufruf nach Ablauf der angegebenen Dauer",
 			"Pause until repeated notification": "Pause bis zur wiederholten Benachrichtigung",
 			"Maximum repetitions (-1=infinite)": "maximale Wiederholungen (-1=unendlich)",
+			"Variable to suspend notifications": "Variable zum Aussetzen von Benachrichtigungen",
 
 			"Humidity": "Luftfeuchtigkeit",
 			"Provide information for \"Reduce humidity possible\"": "Informationen für \"Feuchtigkeit reduzieren möglich\" bereitstellen",
@@ -93,6 +94,7 @@
 			"Closure state": "Verschluss-Zustand",
 			"Triggering time": "Auslöse-Zeitpunkt",
 			"Monitor ventilation": "Lüftung überwachen",
+			"Suspend notification": "Benachrichtigung aussetzen",
 
 			"Outside absolute humidity": "Absolute Luftfeuchtigkeit (aussen)",
 			"Outside specific humidity": "Spezifische Luftfeuchtigkeit (aussen)",
