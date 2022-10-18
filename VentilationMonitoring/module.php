@@ -96,12 +96,12 @@ class VentilationMonitoring extends IPSModule
         parent::MessageSink($timestamp, $senderID, $message, $data);
 
         if ($message == IPS_KERNELMESSAGE && $data[0] == KR_READY) {
-            IPS_RequestAction($this->InstanceID, 'CheckConditions', '');
+            IPS_RunScriptText('IPS_RequestAction(' . $this->InstanceID . ',"CheckConditions", "");');
         }
 
         if (IPS_GetKernelRunlevel() == KR_READY && $message == VM_UPDATE && $data[1] == true /* changed */) {
             $this->SendDebug(__FUNCTION__, 'timestamp=' . $timestamp . ', senderID=' . $senderID . ', message=' . $message . ', data=' . print_r($data, true), 0);
-            IPS_RequestAction($this->InstanceID, 'CheckConditions', '');
+            IPS_RunScriptText('IPS_RequestAction(' . $this->InstanceID . ',"CheckConditions", "");');
         }
     }
 
@@ -348,7 +348,6 @@ class VentilationMonitoring extends IPSModule
 
         if (IPS_GetKernelRunlevel() == KR_READY) {
             $this->CheckConditions();
-            // IPS_RequestAction($this->InstanceID, "CheckConditions", "");
         }
     }
 

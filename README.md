@@ -162,6 +162,9 @@ Es werden folgende Variablenprofile angelegt:
 
 ## 7. Versions-Historie
 
+- 1.2.1 @ 18.10.2022 15:12
+  - Fix: Korrektur zu 1.2 (VM_UPDATE-Handling)
+
 - 1.2 @ 18.10.2022 11:37
   - Neu: optionale Variable zur temporären Unterdrückung von Benachrichtigungen
   - Fix: Verbesserung in MessageSink() um VM_UPDATE-Meldungen zu vermeiden 
