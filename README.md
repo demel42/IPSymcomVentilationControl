@@ -164,7 +164,7 @@ Es werden folgende Variablenprofile angelegt:
 
 - 1.2 @ 18.10.2022 11:37
   - Neu: optionale Variable zur temporären Unterdrückung von Benachrichtigungen
-  - Fix: Verbesserung n MessageSink() um VM_UPDATE-Meldungen zu vermeiden 
+  - Fix: Verbesserung in MessageSink() um VM_UPDATE-Meldungen zu vermeiden 
 
 - 1.1 @ 08.10.2022 14:48
   - Neu: Absicherung des Zugriffs via Semaphore
