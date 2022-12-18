@@ -1442,6 +1442,21 @@ class VentilationMonitoring extends IPSModule
         if ($closureState != self::$CLOSURE_STATE_CLOSE) {
             if (isset($jstate['step']) == false || $jstate['step'] == 'delay') {
                 $duration = $this->CalcDuration();
+                if ($jstate['step'] == 'delay') {
+                    $varID = $this->ReadPropertyInteger('delay_varID');
+                    if (IPS_VariableExists($varID)) {
+                        $tval = GetValueInteger($varID);
+                    } else {
+                        $tval = $this->ReadPropertyInteger('delay_value');
+                    }
+                    if ($tval > 0) {
+                        $unit = $this->ReadPropertyInteger('delay_timeunit');
+                        $sec = $this->CalcByTimeunit($unit, $tval);
+                    }
+                    if ($duration > $sec) {
+                        $duration -= $sec;
+                    }
+                }
                 if ($duration > 0) {
                     $msg .= ', started ventilation phase of ' . $duration . 's';
                 } else {
@@ -1452,6 +1467,28 @@ class VentilationMonitoring extends IPSModule
                 $this->WriteAttributeString('state', json_encode($jstate));
                 $this->MaintainTimer('CheckTimer', $duration * 1000);
                 $this->MonitorTemperature(true);
+
+                $with_reduce_humidity = $this->ReadPropertyBoolean('with_reduce_humidity');
+                $this->SendDebug(__FUNCTION__, 'with_reduce_humidity=' . $this->bool2str($with_reduce_humidity), 0);
+                if ($with_reduce_humidity) {
+                    $reducePossible = $this->GetValue('ReduceHumidityPossible');
+                    $this->SendDebug(__FUNCTION__, 'reducePossible=' . $this->bool2str($reducePossible), 0);
+                    if ($reducePossible == false) {
+                        $notice_script = $this->ReadPropertyString('notice_script');
+                        if ($notice_script != false) {
+                            $params = [
+                                'instanceID'   => $this->InstanceID,
+                                'reason'       => 'ReduceHumidityImpossible',
+                                'ClosureState' => $this->GetValueFormatted('ClosureState'),
+                            ];
+
+                            $params = array_merge($params, $this->GetAllValues());
+
+                            @$r = IPS_RunScriptTextWaitEx($notice_script, $params);
+                            $this->SendDebug(__FUNCTION__, 'script("...", ' . print_r($params, true) . ' => ' . $r, 0);
+                        }
+                    }
+                }
             } else {
                 $duration = $this->CalcDuration();
                 if ($duration > 0) {
@@ -1467,6 +1504,7 @@ class VentilationMonitoring extends IPSModule
                             $triggerTime = $this->GetValue('TriggerTime');
                             $params = [
                                 'instanceID'   => $this->InstanceID,
+                                'reason'       => 'Duration',
                                 'TriggerTime'  => $triggerTime,
                                 'duration'     => ($triggerTime ? $this->seconds2duration(time() - $triggerTime) : ''),
                                 'ClosureState' => $this->GetValueFormatted('ClosureState'),
@@ -1488,6 +1526,7 @@ class VentilationMonitoring extends IPSModule
 
                             @$r = IPS_RunScriptTextWaitEx($notice_script, $params);
                             $this->SendDebug(__FUNCTION__, 'script("...", ' . print_r($params, true) . ' => ' . $r, 0);
+
                             $jstate['step'] = 'notified';
                         }
 

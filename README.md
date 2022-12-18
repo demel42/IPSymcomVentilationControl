@@ -112,9 +112,13 @@ Dem Script werden Parameter übergeben, die als Bestandteil von *_IPS* enthalten
 | Name         | Typ      | Beschreibung |
 | :----------- | :------  | :----------- |
 | instanceID   | integer  | ID der aufrufenden Instanz
+|              |          | |
+| reason       | string   | Grund der Benachrichtigung (_ReduceHumidityImpossible_, _Duration_) |
+|              |          | |
+| ClosureState | string   | Öffnungsstatus (gemäß *VentilationMonitoring.ClosureState*) |
+|              |          | |
 | TriggerTime  | integer  | Zeitpunkt der Erkennung des Öffnungsstatus |
 | duration     | string   | Dauer ab Öffnung in lesbarer Form |
-| ClosureState | string   | Öffnungsstatus (gemäß *VentilationMonitoring.ClosureState*) |
 |              |          | |
 | targets      | string   | Komma-separierte Liste der Ziele der Temperaturabsenkung |
 |              |          | |
@@ -161,6 +165,11 @@ Es werden folgende Variablenprofile angelegt:
    - https://www.cactus2000.de/de/unit/masshum.shtml
 
 ## 7. Versions-Historie
+
+- 1.3 @ 20.11.2022 15:51
+  - Fix: die erste Wartezeit bis zur Meldung wird um die Verzögerung verkürzt
+  - Neu: bei aktivierter "Lüften möglich"-Prüfung wird eine Benachrichtigung ausgelöst
+  - update submodule CommonStubs
 
 - 1.2.1 @ 18.10.2022 15:12
   - Fix: Korrektur zu 1.2 (VM_UPDATE-Handling)
