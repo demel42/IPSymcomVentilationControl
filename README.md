@@ -166,6 +166,12 @@ Es werden folgende Variablenprofile angelegt:
 
 ## 7. Versions-Historie
 
+- 1.4 @ 06.07.2023 09:41
+  - Neu: Angabe der Aussentemperatur bis zu der geheizt wird (also eine Absenkung Sinn macht)
+  - Vorbereitung auf IPS 7 / PHP 8.2
+  - update submodule CommonStubs
+    - Absicherung bei Zugriff auf Objekte und Inhalte
+
 - 1.3 @ 20.11.2022 15:51
   - Fix: die erste Wartezeit bis zur Meldung wird um die Verzögerung verkürzt
   - Neu: bei aktivierter "Lüften möglich"-Prüfung wird eine Benachrichtigung ausgelöst

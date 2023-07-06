@@ -44,6 +44,8 @@
 			"Stop lowering the temperature": "Absenkung der Temperatur beenden",
 			"Do nothing": "nichts tun",
 
+			"Heater off above from (outside)": "Heizung aus oberhalb von (aussen)",
+
 			"Upper temperature limit": "Temperatur Obergrenze",
 			"Complex condition": "Komplexe Bedingungen",
 			"Duration at \"open\"": "Dauer bei \"offen\"",
@@ -75,6 +77,8 @@
 
 			"__actions__": "",
 			"Check conditions": "Bedingungen prüfen",
+
+			"Value": "Wert",
 
 			"internal informations": "interne Informationen",
 			"temperature values": "Temperatur-Werte",
