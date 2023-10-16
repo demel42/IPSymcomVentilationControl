@@ -166,6 +166,10 @@ Es werden folgende Variablenprofile angelegt:
 
 ## 7. Versions-Historie
 
+- 1.5 @ 21.09.2023 14:10
+  - Neu: Ermittlung von Speicherbedarf und Laufzeit (aktuell und für 31 Tage) und Anzeige im Panel "Information"
+  - update submodule CommonStubs
+
 - 1.4 @ 06.07.2023 09:41
   - Neu: Angabe der Aussentemperatur bis zu der geheizt wird (also eine Absenkung Sinn macht)
   - Vorbereitung auf IPS 7 / PHP 8.2

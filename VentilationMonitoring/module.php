@@ -10,8 +10,6 @@ class VentilationMonitoring extends IPSModule
     use VentilationMonitoring\StubsCommonLib;
     use VentilationMonitoringLocalLib;
 
-    private static $semaphoreTM = 5 * 1000;
-
     public static $LOWERING_MODE_TEMP = 0;
     public static $LOWERING_MODE_TRIGGER = 1;
     public static $LOWERING_MODE_SCRIPT = 2;
@@ -20,15 +18,21 @@ class VentilationMonitoring extends IPSModule
     public static $TEMP_CHANGE_STOP = 1;
     public static $TEMP_CHANGE_IGNORE = 2;
 
-    private $ModuleDir;
+    private static $semaphoreTM = 5 * 1000;
+
     private $SemaphoreID;
 
     public function __construct(string $InstanceID)
     {
         parent::__construct($InstanceID);
 
-        $this->ModuleDir = __DIR__;
+        $this->CommonContruct(__DIR__);
         $this->SemaphoreID = __CLASS__ . '_' . $InstanceID;
+    }
+
+    public function __destruct()
+    {
+        $this->CommonDestruct();
     }
 
     public function Create()
@@ -82,9 +86,10 @@ class VentilationMonitoring extends IPSModule
 
         $this->RegisterPropertyFloat('mold_hum_min', 60);
 
-        $this->RegisterAttributeString('UpdateInfo', '');
-
         $this->RegisterAttributeString('state', json_encode([]));
+
+        $this->RegisterAttributeString('UpdateInfo', json_encode([]));
+        $this->RegisterAttributeString('ModuleStats', json_encode([]));
 
         $this->InstallVarProfiles(false);
 
